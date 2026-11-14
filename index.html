@@ -23,7 +23,49 @@ function googleReady(){return !!googleToken&&Date.now()<googleExpiry-60000}
 async function googleApi(path,options={}){if(!googleReady())throw Error('Google session expired. Click Connect Google again.');let r=await fetch('https://www.googleapis.com/calendar/v3/'+path,{...options,headers:{Authorization:'Bearer '+googleToken,'Content-Type':'application/json',...(options.headers||{})}});if(!r.ok){let data=await r.json().catch(()=>({}));throw Error(data.error?.message||('Google API error '+r.status))}return r.status===204?null:r.json()}
 function googleEventToLocal(e){let raw=e.start?.dateTime||e.start?.date;if(!raw)return null;let date=raw.slice(0,10);if(!inRange(date))return null;let start=e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('en-GB',{timeZone:'America/Chicago',hour:'2-digit',minute:'2-digit',hour12:false}):'';let end=e.end?.dateTime?new Date(e.end.dateTime).toLocaleTimeString('en-GB',{timeZone:'America/Chicago',hour:'2-digit',minute:'2-digit',hour12:false}):'';return {id:'gcal-'+e.id,googleId:e.id,source:'google',date,title:e.summary||'(Untitled Google event)',category:'Other',start,end,notes:e.description||'',repeat:false,breakMinutes:0,leaveHours:0,googleAllDay:!e.start?.dateTime}}
 async function refreshGoogle(){if(googleBusy)return;googleBusy=true;googleStatus('Loading Google Calendar events…');try{let page='',all=[];do{let q=new URLSearchParams({timeMin:'2026-11-01T00:00:00-05:00',timeMax:'2028-01-01T00:00:00-06:00',singleEvents:'true',maxResults:'2500',timeZone:'America/Chicago'});if(page)q.set('pageToken',page);let result=await googleApi('calendars/primary/events?'+q);all.push(...result.items.filter(x=>x.status!=='cancelled'));page=result.nextPageToken||''}while(page);events=events.filter(x=>x.source!=='google'&&!String(x.id).startsWith('gcal-'));events.push(...all.map(googleEventToLocal).filter(Boolean));render();googleStatus(`Connected. ${all.length} Google events retrieved. Click Refresh to update.`)}catch(err){googleStatus('Sync error: '+err.message)}finally{googleBusy=false}}
-$('googleConnect').onclick=()=>{const id=$('googleClientId').value.trim();if(!id){googleStatus('Enter and save your OAuth web client ID first.');return}if(location.protocol==='file:'){googleStatus('Google sign-in requires HTTPS hosting or localhost. Downloaded file:// pages cannot connect.');return}if(!window.google?.accounts?.oauth2){googleStatus('Google sign-in library unavailable. Check your internet connection or browser restrictions.');return}googleStatus('Opening Google sign-in...');try{googleTokenClient=google.accounts.oauth2.initTokenClient({client_id:id,scope:'https://www.googleapis.com/auth/calendar.events',callback:async response=>{if(response.error||!response.access_token){googleStatus('Google authorization failed: '+(response.error_description||response.error||'No access token received'));return}googleToken=response.access_token;googleExpiry=Date.now()+Number(response.expires_in||3600)*1000;googleStatus('Google authorized. Loading calendar...');await refreshGoogle()},error_callback:error=>{googleStatus('Google popup error: '+(error.message||error.type||'Unknown error'))}});googleTokenClient.requestAccessToken({prompt:'consent'})}catch(err){googleStatus('Google connection error: '+err.message)}};
+// Previously approved Google Calendar access should not force a new consent screen on every click.
+let googlePopupFailures=0;
+$('googleConnect').onclick=()=>{
+  const id=$('googleClientId').value.trim();
+  if(!/^[\\w-]+\\.apps\\.googleusercontent\\.com$/.test(id)){googleStatus('Enter and save a valid Google OAuth web client ID.');return}
+  if(location.protocol==='file:'){googleStatus('Google connection requires the published HTTPS website, not a downloaded file.');return}
+  if(!window.google?.accounts?.oauth2){googleStatus('Google sign-in library did not load. Reload the website and check privacy extensions.');return}
+  if(googleBusy){googleStatus('Google Calendar is still loading.');return}
+  googleStatus('Opening Google sign-in...');
+  try{
+    googleTokenClient=google.accounts.oauth2.initTokenClient({
+      client_id:id,
+      scope:'https://www.googleapis.com/auth/calendar.events',
+      callback:async response=>{
+        if(response.error||!response.access_token){
+          googleStatus('Google authorization failed: '+(response.error_description||response.error||'No access token returned'));
+          return;
+        }
+        googleToken=response.access_token;
+        googleExpiry=Date.now()+Number(response.expires_in||3600)*1000;
+        googlePopupFailures=0;
+        googleStatus('Google authorized. Loading events...');
+        await refreshGoogle();
+      },
+      error_callback:error=>{
+        if(googleReady())return;
+        const reason=error?.type||error?.message||'Unknown error';
+        if(reason==='popup_closed'){
+          googlePopupFailures++;
+          googleStatus(googlePopupFailures===1
+            ? 'Google closed the sign-in window before sending access to the calendar. Click Connect Google to try once more without the consent prompt.'
+            : 'Google sign-in popup closed without an access token. This is not a calendar or GitHub file error. Try disabling Chrome privacy/ad-blocking extensions for this site or use another Chrome profile, then click Connect Google.');
+        }else if(reason==='popup_failed_to_open'){
+          googleStatus('Chrome blocked the Google sign-in popup. Allow popups for this site and click Connect Google.');
+        }else{
+          googleStatus('Google sign-in error: '+reason);
+        }
+      }
+    });
+    // Do not force consent on each attempt. Ask for account choice only after a popup failure.
+    googleTokenClient.requestAccessToken({prompt:googlePopupFailures?'select_account':''});
+  }catch(err){googleStatus('Google connection error: '+err.message)}
+};
 $('googleRefresh').onclick=()=>refreshGoogle();
 $('googleDisconnect').onclick=()=>{if(googleToken&&window.google?.accounts?.oauth2)google.accounts.oauth2.revoke(googleToken,()=>{});googleToken='';googleExpiry=0;events=events.filter(x=>x.source!=='google'&&!String(x.id).startsWith('gcal-'));render();googleStatus('Disconnected. Google events removed from this view.')};
 function googlePayload(item){let allDay=!item.start||!item.end;if(allDay){let end=parse(item.date);end.setDate(end.getDate()+1);return {summary:item.title,description:item.notes||'',start:{date:item.date},end:{date:iso(end.getFullYear(),end.getMonth(),end.getDate())}}}return {summary:item.title,description:item.notes||'',start:{dateTime:`${item.date}T${item.start}:00`,timeZone:'America/Chicago'},end:{dateTime:`${item.date}T${item.end}:00`,timeZone:'America/Chicago'}}}

@@ -355,6 +355,7 @@ function dashboardKind(e){
  if(e.category==='Lambda Theta Sigma Meeting'||/\b(lambda theta sigma|lts|director of wellness|brotherhood meeting)\b/i.test(t))return 'lambda';
  return 'personal';
 }
+function birthdayDisplayDate(date){const d=parse(date),n=d.getDate(),suffix=n%100>=11&&n%100<=13?'th':n%10===1?'st':n%10===2?'nd':n%10===3?'rd':'th';return d.toLocaleDateString('en-US',{month:'long'})+' '+n+suffix}
 function dashboardPriority(e,kind){
  if(kind==='college')return /DUE|exam|project|deadline/i.test(e.title);
  if(kind==='lambda')return /meeting|wellness|service/i.test(e.title);
@@ -381,7 +382,7 @@ function renderIndividualDashboards(){
   $(''+kind+'DashboardSummary').innerHTML=cards.map(([key,count,label])=>'<button type="button" class="individual-stat'+(filter===key?' is-selected':'')+'" data-stat-filter="'+key+'" data-stat-kind="'+kind+'" aria-pressed="'+(filter===key)+'"><strong>'+count+'</strong><span>'+label+'</span></button>').join('');
   const shown=kind==='personal'&&personalBranch==='birthdays'?filter==='week'?next7:filter==='month'?soon:upcoming:filter==='all'?arr:filter==='week'?next7:filter==='month'?soon:filter==='special'?priority:upcoming;
   $(''+kind+'DashboardHeading').textContent=(kind==='personal'&&personalBranch!=='all'?({birthdays:'🎂 Birthdays',social:'💵 Social Security',bills:'🧾 Bills'}[personalBranch]+' · '):'')+(filter==='all'&&kind==='personal'&&personalBranch==='birthdays'?'Upcoming birthdays':filter==='all'?'All calendar entries':filter==='week'?'Next 7 days · Highlighted':filter==='month'?'Next 30 days':filter==='special'?specialLabel+' · Highlighted':'Upcoming events');
-  $(''+kind+'DashboardEvents').innerHTML=shown.length?shown.slice(0,150).map(e=>'<div class="individual-event'+(filter==='week'||filter==='special'?' is-highlighted':'')+'"><div><strong>'+linkify(e.title)+'</strong><small>'+escape(displayDate(e.displayDate))+(e.start?' · '+escape(e.start):'')+' · '+escape(e.category)+'</small>'+(e.notes?'<small>'+linkify(e.notes)+'</small>':'')+'</div><button type="button" data-open-date="'+escape(e.displayDate)+'">View / Edit</button></div>').join(''):'<p class="individual-empty">No matching events for this selection.</p>';
+  $(''+kind+'DashboardEvents').innerHTML=shown.length?shown.slice(0,150).map(e=>'<div class="individual-event'+(filter==='week'||filter==='special'?' is-highlighted':'')+'"><div><strong>'+linkify(e.title)+'</strong><small>'+escape(kind==='personal'&&personalBranch==='birthdays'?birthdayDisplayDate(e.displayDate):displayDate(e.displayDate))+(e.start?' · '+escape(e.start):'')+' · '+escape(e.category)+'</small>'+(e.notes?'<small>'+linkify(e.notes)+'</small>':'')+'</div><button type="button" data-open-date="'+escape(e.displayDate)+'">View / Edit</button></div>').join(''):'<p class="individual-empty">No matching events for this selection.</p>';
  }
 }
 document.querySelectorAll('.individual-stats').forEach(box=>box.addEventListener('click',event=>{
@@ -434,7 +435,7 @@ function renderCommand(){
  $('commandReminders').innerHTML=due.length?due.slice(0,30).map(e=>trackerRow(e,'<button data-track-day="'+escape(e.displayDate)+'">Open day</button>')).join(''):'<p class="note">No urgent events in the next 7 days.</p>';
  $('commandBills').innerHTML=bills.length?bills.slice(0,60).map(e=>{const key=trackerKey(e),paid=!!track.bills[key];return trackerRow(e,'<small class="command-status">'+(paid?'Paid':e.displayDate<today?'Overdue':'Unpaid')+'</small><button data-track-bill="'+escape(key)+'">'+(paid?'Mark unpaid':'Mark paid')+'</button>')}).join(''):'<p class="note">No bills found. Add bill events in your Personal calendar.</p>';
  const bdays=upcoming.filter(birthday);
- $('commandBirthdays').innerHTML=bdays.length?bdays.slice(0,30).map(e=>trackerRow(e,'<small>'+Math.round((parse(e.displayDate)-parse(today))/86400000)+' days away</small><button data-track-birthday="1">Copy greeting</button>')).join(''):'<p class="note">No upcoming birthdays found.</p>';
+ $('commandBirthdays').innerHTML=bdays.length?bdays.slice(0,30).map(e=>'<div class="command-entry"><strong>'+linkify(e.title)+'</strong><small>'+escape(birthdayDisplayDate(e.displayDate))+' · '+Math.round((parse(e.displayDate)-parse(today))/86400000)+' days away</small><button data-track-birthday="1">Copy greeting</button></div>').join(''):'<p class="note">No upcoming birthdays found.</p>';
  const assignments=upcoming.filter(college),complete=assignments.filter(e=>track.college[trackerKey(e)]==='Completed').length;
  $('commandCollege').innerHTML='<p class="note">'+complete+' of '+assignments.length+' complete</p>'+(assignments.length?assignments.slice(0,55).map(e=>{const key=trackerKey(e),status=track.college[key]||'Not started';return trackerRow(e,'<label>Progress <select data-track-college="'+escape(key)+'">'+['Not started','In progress','Completed'].map(v=>'<option'+(v===status?' selected':'')+'>'+v+'</option>').join('')+'</select></label>')}).join(''):'<p class="note">No upcoming coursework found.</p>');
  const hours=Object.entries(track.hours).sort((a,b)=>b[0].localeCompare(a[0])),actual=hours.reduce((n,x)=>n+Number(x[1]),0);

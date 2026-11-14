@@ -77,7 +77,7 @@ googleRedirectButton.title='Use a full-page Google sign-in instead of a popup';
 $('googleConnect').insertAdjacentElement('afterend',googleRedirectButton);
 googleRedirectButton.onclick=()=>{
   const id=$('googleClientId').value.trim();
-  if(!/^[\\w-]+\\.apps\\.googleusercontent\\.com$/.test(id)){googleStatus('Enter a valid Google OAuth client ID and click Save configuration first.');return}
+  if(!/^[\w-]+\.apps\.googleusercontent\.com$/.test(id)){googleStatus('Enter a valid Google OAuth client ID and click Save configuration first.');return}
   if(location.protocol!=='https:'){googleStatus('Full-page Google sign-in requires HTTPS.');return}
   const bytes=new Uint8Array(24);
   crypto.getRandomValues(bytes);

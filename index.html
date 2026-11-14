@@ -416,6 +416,79 @@ document.querySelectorAll('[data-dashboard-today]').forEach(btn=>btn.addEventLis
  const d=new Date(),today=iso(d.getFullYear(),d.getMonth(),d.getDate());openDay(inRange(today)?today:FIRST);
 }));
 document.querySelectorAll('.individual-events').forEach(box=>box.addEventListener('click',e=>{const btn=e.target.closest('[data-open-date]');if(btn)openDay(btn.dataset.openDate)}));
+
+const COMMAND_KEY='nico-command-tracker-v1';
+let commandState={bills:{},college:{},hours:{},tasks:[]};
+try{const v=JSON.parse(localStorage.getItem(COMMAND_KEY)||'{}');if(v&&typeof v==='object')commandState={bills:v.bills||{},college:v.college||{},hours:v.hours||{},tasks:Array.isArray(v.tasks)?v.tasks:[]}}catch(_){}
+const saveCommand=()=>{try{localStorage.setItem(COMMAND_KEY,JSON.stringify(commandState))}catch(_){alert('Unable to save tracker data in this browser. Export a backup.')}};
+const commandToday=()=>{const d=new Date();return iso(d.getFullYear(),d.getMonth(),d.getDate())};
+const commandEvents=()=>{const result=[];for(let d=new Date(2026,10,1);d<=new Date(2027,11,31);d.setDate(d.getDate()+1)){const date=iso(d.getFullYear(),d.getMonth(),d.getDate());for(const e of onDay(date))result.push({...e,displayDate:date})}return result};
+const commandKey=e=>e.displayDate+'|'+e.title;
+const commandIsBill=e=>dashboardKind(e)==='personal'&&personalGroup(e)==='bills';
+const commandIsBirthday=e=>dashboardKind(e)==='personal'&&personalGroup(e)==='birthdays';
+const commandIsCollege=e=>dashboardKind(e)==='college'&&(/DUE|assignment|homework|exam|project|deadline|reminder/i.test(e.title));
+function commandRow(e,actions){
+ return '<div class="command-entry"><strong>'+linkify(e.title)+'</strong><small>'+escape(displayDate(e.displayDate))+(e.start?' · '+escape(e.start):'')+'</small>'+(actions||'')+'</div>';
+}
+function renderCommand(){
+ const all=commandEvents(),today=commandToday(),week=new Date(parse(today));week.setDate(week.getDate()+7);
+ const weekEnd=iso(week.getFullYear(),week.getMonth(),week.getDate());
+ const upcoming=all.filter(e=>e.displayDate>=today),soon=upcoming.filter(e=>e.displayDate<=weekEnd);
+ const relevant=soon.filter(e=>commandIsBill(e)||commandIsBirthday(e)||commandIsCollege(e)||e.category==='Doctor’s Appointment'||/appointment|telehealth|meeting/i.test(e.title));
+ $('commandReminders').innerHTML=relevant.length?relevant.slice(0,25).map(e=>commandRow(e,'<button data-command-date="'+escape(e.displayDate)+'">Open day</button>')).join(''):'<p class="note">Nothing requiring attention in the next seven days.</p>';
+ const bills=upcoming.filter(commandIsBill).slice(0,40);
+ $('commandBills').innerHTML=bills.length?bills.map(e=>{const key=commandKey(e),paid=!!commandState.bills[key],overdue=e.displayDate<today&&!paid;return commandRow(e,'<span class="command-status">'+(paid?'✓ Paid':overdue?'Overdue':'Unpaid')+'</span> <button data-command-bill="'+escape(key)+'">'+(paid?'Mark unpaid':'Mark paid')+'</button>')}).join(''):'<p class="note">No upcoming bill entries. Existing bills can be found in the Personal dashboard.</p>';
+ const birthdays=upcoming.filter(commandIsBirthday).slice(0,25);
+ $('commandBirthdays').innerHTML=birthdays.length?birthdays.map(e=>{const days=Math.round((parse(e.displayDate)-parse(today))/86400000);return commandRow(e,'<small>'+days+' day'+(days===1?'':'s')+' away</small><button data-command-birthday="'+escape(e.title)+'">Copy birthday greeting</button>')}).join(''):'<p class="note">No upcoming birthdays found.</p>';
+ const college=upcoming.filter(commandIsCollege).slice(0,45),done=college.filter(e=>commandState.college[commandKey(e)]==='Completed').length;
+ $('commandCollege').innerHTML='<p class="note">'+done+' of '+college.length+' upcoming items marked complete</p>'+(college.length?college.map(e=>{const key=commandKey(e),status=commandState.college[key]||'Not started';return '<div class="command-entry '+(status==='Completed'?'command-done':'')+'"><strong>'+linkify(e.title)+'</strong><small>'+escape(displayDate(e.displayDate))+'</small><label>Status <select data-command-college="'+escape(key)+'"><option'+(status==='Not started'?' selected':'')+'>Not started</option><option'+(status==='In progress'?' selected':'')+'>In progress</option><option'+(status==='Completed'?' selected':'')+'>Completed</option></select></label></div>'}).join(''):'<p class="note">No upcoming assignment reminders.</p>');
+ const hours=Object.entries(commandState.hours).sort((a,b)=>b[0].localeCompare(a[0])),actual=hours.reduce((n,[,h])=>n+Number(h||0),0);
+ $('commandHertz').innerHTML='<p><strong>'+actual.toFixed(2)+' actual hours entered</strong> · Estimated gross 
+render=function(){originalRender();renderMyDay();renderIndividualDashboards();if(!$("commandPanel").classList.contains("hidden"))renderCommand()};
+$('myDayBtn').addEventListener('click',()=>{const p=$('myDayPanel'),open=p.classList.contains('hidden');p.classList.toggle('hidden',!open);$('myDayBtn').setAttribute('aria-expanded',String(open));if(open){renderMyDay();p.scrollIntoView({behavior:'smooth',block:'start'})}});
+$('myDayClose').addEventListener('click',()=>{$('myDayPanel').classList.add('hidden');$('myDayBtn').setAttribute('aria-expanded','false')});
+render();
+if(googleCacheSavedAt){
+ const when=new Date(googleCacheSavedAt);
+ googleStatus('Showing saved Google events from '+(Number.isNaN(when.getTime())?'a previous sync':when.toLocaleString())+'. Connect Google and refresh for new changes.');
+}
+})();
+</script><script src="https://accounts.google.com/gsi/client" async defer></script></body></html>
++(actual*15.5).toFixed(2)+'</p>'+hours.slice(0,15).map(([date,h])=>'<div class="command-entry">'+escape(displayDate(date))+' · '+Number(h).toFixed(2)+' hours · 
+render=function(){originalRender();renderMyDay();renderIndividualDashboards()};
+$('myDayBtn').addEventListener('click',()=>{const p=$('myDayPanel'),open=p.classList.contains('hidden');p.classList.toggle('hidden',!open);$('myDayBtn').setAttribute('aria-expanded',String(open));if(open){renderMyDay();p.scrollIntoView({behavior:'smooth',block:'start'})}});
+$('myDayClose').addEventListener('click',()=>{$('myDayPanel').classList.add('hidden');$('myDayBtn').setAttribute('aria-expanded','false')});
+render();
+if(googleCacheSavedAt){
+ const when=new Date(googleCacheSavedAt);
+ googleStatus('Showing saved Google events from '+(Number.isNaN(when.getTime())?'a previous sync':when.toLocaleString())+'. Connect Google and refresh for new changes.');
+}
+})();
+</script><script src="https://accounts.google.com/gsi/client" async defer></script></body></html>
++(Number(h)*15.5).toFixed(2)+' <button data-command-hour-remove="'+escape(date)+'">Remove</button></div>').join('');
+ $('commandLambda').innerHTML=commandState.tasks.length?commandState.tasks.slice().sort((a,b)=>(a.done===b.done?0:a.done?1:-1)||String(a.date||'').localeCompare(String(b.date||''))).map(t=>'<div class="command-entry '+(t.done?'command-done':'')+'"><strong>'+escape(t.title)+'</strong><small>'+(t.date?escape(displayDate(t.date)):'No date set')+'</small><button data-command-task-toggle="'+escape(t.id)+'">'+(t.done?'Reopen':'Mark complete')+'</button><button data-command-task-delete="'+escape(t.id)+'">Delete</button></div>').join(''):'<p class="note">Add a wellness or Brotherhood task above.</p>';
+ const q=$('globalEventSearch').value.trim().toLowerCase();
+ if(q){const found=all.filter(e=>(e.title+' '+(e.notes||'')+' '+e.displayDate+' '+e.category).toLowerCase().includes(q)).slice(0,80);$('commandSearchResults').innerHTML='<h3>🔎 Search results ('+found.length+(found.length===80?'+':'')+')</h3>'+(found.length?found.map(e=>commandRow(e,'<button data-command-date="'+escape(e.displayDate)+'">Open day</button>')).join(''):'<p class="note">No matches found.</p>')}else $('commandSearchResults').innerHTML='';
+}
+$('commandBtn').addEventListener('click',()=>{const p=$('commandPanel'),open=p.classList.contains('hidden');p.classList.toggle('hidden',!open);if(open){toggleHertz(false);document.querySelectorAll('.individual-dashboard').forEach(el=>{if(el!==p)el.classList.add('hidden')});renderCommand();p.scrollIntoView({behavior:'smooth',block:'start'})}});
+$('commandClose').addEventListener('click',()=>$('commandPanel').classList.add('hidden'));
+$('globalEventSearch').addEventListener('input',renderCommand);
+$('commandPanel').addEventListener('click',e=>{
+ const b=e.target.closest('button');if(!b)return;
+ if(b.dataset.commandDate){openDay(b.dataset.commandDate);return}
+ if(b.dataset.commandBill){const key=b.dataset.commandBill;commandState.bills[key]=!commandState.bills[key];saveCommand();renderCommand();return}
+ if(b.dataset.commandBirthday){const msg='Happy Birthday! 🎂 Wishing you a wonderful day filled with joy and love.';if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(msg).then(()=>alert('Birthday greeting copied!')).catch(()=>prompt('Copy birthday greeting:',msg));else prompt('Copy birthday greeting:',msg);return}
+ if(b.dataset.commandHourRemove){delete commandState.hours[b.dataset.commandHourRemove];saveCommand();renderCommand();return}
+ if(b.dataset.commandTaskToggle){const t=commandState.tasks.find(t=>t.id===b.dataset.commandTaskToggle);if(t)t.done=!t.done;saveCommand();renderCommand();return}
+ if(b.dataset.commandTaskDelete){commandState.tasks=commandState.tasks.filter(t=>t.id!==b.dataset.commandTaskDelete);saveCommand();renderCommand()}
+});
+$('commandPanel').addEventListener('change',e=>{if(e.target.dataset.commandCollege){commandState.college[e.target.dataset.commandCollege]=e.target.value;saveCommand();renderCommand()}});
+$('actualHoursDate').value=commandToday();
+$('actualHoursForm').addEventListener('submit',e=>{e.preventDefault();const date=$('actualHoursDate').value,h=Number($('actualHoursValue').value);if(!date||!Number.isFinite(h)||h<0||h>24)return;commandState.hours[date]=h;saveCommand();renderCommand();$('actualHoursValue').value=''});
+$('lambdaTaskForm').addEventListener('submit',e=>{e.preventDefault();const title=$('lambdaTaskTitle').value.trim();if(!title)return;commandState.tasks.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2),title,date:$('lambdaTaskDate').value,done:false});saveCommand();renderCommand();$('lambdaTaskTitle').value=''});
+$('commandBackup').addEventListener('click',()=>{const blob=new Blob([JSON.stringify({format:'nico-planning-tracker-v1',exported:new Date().toISOString(),data:commandState},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='nico-planning-tracker-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)});
+$('commandRestore').addEventListener('click',()=>$('commandRestoreFile').click());
+$('commandRestoreFile').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{const v=JSON.parse(await file.text());if(v.format!=='nico-planning-tracker-v1'||!v.data||typeof v.data!=='object')throw Error('Invalid backup');if(!confirm('Replace your current tracker checklists, tasks, and actual hours with this backup? Calendar events will not be changed.'))return;commandState={bills:v.data.bills||{},college:v.data.college||{},hours:v.data.hours||{},tasks:Array.isArray(v.data.tasks)?v.data.tasks:[]};saveCommand();renderCommand();alert('Tracker restored.')}catch(_){alert('This is not a valid Nico tracker backup.')}finally{e.target.value=''}});
 const originalRender=render;
 render=function(){originalRender();renderMyDay();renderIndividualDashboards()};
 $('myDayBtn').addEventListener('click',()=>{const p=$('myDayPanel'),open=p.classList.contains('hidden');p.classList.toggle('hidden',!open);$('myDayBtn').setAttribute('aria-expanded',String(open));if(open){renderMyDay();p.scrollIntoView({behavior:'smooth',block:'start'})}});

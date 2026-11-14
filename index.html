@@ -66,6 +66,52 @@ $('googleConnect').onclick=()=>{
     googleTokenClient.requestAccessToken({prompt:googlePopupFailures?'select_account':''});
   }catch(err){googleStatus('Google connection error: '+err.message)}
 };
+// Redirect-based OAuth fallback for browsers where Google's popup cannot return a token.
+// Google Cloud must list this exact URL under Authorized redirect URIs.
+const GOOGLE_REDIRECT_URI=location.origin+location.pathname;
+const GOOGLE_REDIRECT_STATE_KEY='nico-google-oauth-state-v1';
+const googleRedirectButton=document.createElement('button');
+googleRedirectButton.type='button';
+googleRedirectButton.textContent='Connect Google without popup';
+googleRedirectButton.title='Use a full-page Google sign-in instead of a popup';
+$('googleConnect').insertAdjacentElement('afterend',googleRedirectButton);
+googleRedirectButton.onclick=()=>{
+  const id=$('googleClientId').value.trim();
+  if(!/^[\\w-]+\\.apps\\.googleusercontent\\.com$/.test(id)){googleStatus('Enter a valid Google OAuth client ID and click Save configuration first.');return}
+  if(location.protocol!=='https:'){googleStatus('Full-page Google sign-in requires HTTPS.');return}
+  const bytes=new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  const state=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+  sessionStorage.setItem(GOOGLE_REDIRECT_STATE_KEY,state);
+  localStorage.setItem(GOOGLE_CONFIG_KEY,id);
+  const params=new URLSearchParams({
+    client_id:id,
+    redirect_uri:GOOGLE_REDIRECT_URI,
+    response_type:'token',
+    scope:'https://www.googleapis.com/auth/calendar.events',
+    state,
+    include_granted_scopes:'true',
+    prompt:'consent'
+  });
+  location.assign('https://accounts.google.com/o/oauth2/v2/auth?'+params);
+};
+function restoreGoogleRedirect(){
+  if(!location.hash.includes('access_token=')&&!location.hash.includes('error='))return;
+  const fragment=new URLSearchParams(location.hash.slice(1));
+  const expected=sessionStorage.getItem(GOOGLE_REDIRECT_STATE_KEY);
+  const returned=fragment.get('state');
+  history.replaceState(null,'',location.pathname+location.search);
+  sessionStorage.removeItem(GOOGLE_REDIRECT_STATE_KEY);
+  if(!expected||!returned||expected!==returned){googleStatus('Google sign-in security check failed. Click Connect Google without popup to try again.');return}
+  if(fragment.has('error')){googleStatus('Google redirect authorization failed: '+(fragment.get('error_description')||fragment.get('error')));return}
+  const token=fragment.get('access_token');
+  if(!token){googleStatus('Google returned no access token. Try Connect Google without popup again.');return}
+  googleToken=token;
+  googleExpiry=Date.now()+Number(fragment.get('expires_in')||3600)*1000;
+  googleStatus('Google authorized. Loading calendar events...');
+  refreshGoogle();
+}
+restoreGoogleRedirect();
 $('googleRefresh').onclick=()=>refreshGoogle();
 $('googleDisconnect').onclick=()=>{if(googleToken&&window.google?.accounts?.oauth2)google.accounts.oauth2.revoke(googleToken,()=>{});googleToken='';googleExpiry=0;events=events.filter(x=>x.source!=='google'&&!String(x.id).startsWith('gcal-'));render();googleStatus('Disconnected. Google events removed from this view.')};
 function googlePayload(item){let allDay=!item.start||!item.end;if(allDay){let end=parse(item.date);end.setDate(end.getDate()+1);return {summary:item.title,description:item.notes||'',start:{date:item.date},end:{date:iso(end.getFullYear(),end.getMonth(),end.getDate())}}}return {summary:item.title,description:item.notes||'',start:{dateTime:`${item.date}T${item.start}:00`,timeZone:'America/Chicago'},end:{dateTime:`${item.date}T${item.end}:00`,timeZone:'America/Chicago'}}}

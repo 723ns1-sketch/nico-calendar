@@ -27,7 +27,7 @@ async function refreshGoogle(){if(googleBusy)return;googleBusy=true;googleStatus
 let googlePopupFailures=0;
 $('googleConnect').onclick=()=>{
   const id=$('googleClientId').value.trim();
-  if(!/^[\\w-]+\\.apps\\.googleusercontent\\.com$/.test(id)){googleStatus('Enter and save a valid Google OAuth web client ID.');return}
+  if(!/^[\w-]+\.apps\.googleusercontent\.com$/.test(id)){googleStatus('Enter and save a valid Google OAuth web client ID.');return}
   if(location.protocol==='file:'){googleStatus('Google connection requires the published HTTPS website, not a downloaded file.');return}
   if(!window.google?.accounts?.oauth2){googleStatus('Google sign-in library did not load. Reload the website and check privacy extensions.');return}
   if(googleBusy){googleStatus('Google Calendar is still loading.');return}

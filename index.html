@@ -279,9 +279,9 @@ function renderMyDay(){
   const day=iso(date.getFullYear(),date.getMonth(),date.getDate());if(!inRange(day))continue;
   for(const e of onDay(day))all.push({...e,displayDate:day});
  }
- const work=e=>e.category==='Work Schedule'||/\\b(hertz|work shift|irr shift)\\b/i.test(e.title);
- const college=e=>/\\b(dallas college|class|course|homework|assignment|exam|quiz|professor|syllabus|discussion post|study session)\\b/i.test(e.title+' '+(e.notes||''))||e.category==='Project Due';
- const lambda=e=>e.category==='Lambda Theta Sigma Meeting'||/\\b(lambda theta sigma|lts|director of wellness|brotherhood meeting)\\b/i.test(e.title+' '+(e.notes||''));
+ const work=e=>e.category==='Work Schedule'||/\b(hertz|work shift|irr shift)\b/i.test(e.title);
+ const college=e=>/\b(dallas college|class|course|homework|assignment|exam|quiz|professor|syllabus|discussion post|study session)\b/i.test(e.title+' '+(e.notes||''))||e.category==='Project Due';
+ const lambda=e=>e.category==='Lambda Theta Sigma Meeting'||/\b(lambda theta sigma|lts|director of wellness|brotherhood meeting)\b/i.test(e.title+' '+(e.notes||''));
  const personal=e=>!work(e)&&!college(e)&&!lambda(e);
  const item=e=>'<div class="item"><strong>'+escape(e.title)+'</strong><span class="date">'+escape(e.displayDate)+(e.start?' · '+escape(e.start):'')+'</span></div>';
  const show=(id,arr,empty)=>{$(id).innerHTML=arr.length?arr.map(item).join(''):'<p class="empty">'+empty+'</p>'};

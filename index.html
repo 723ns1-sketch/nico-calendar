@@ -502,8 +502,7 @@ if(googleCacheSavedAt){
 </script><script src="https://accounts.google.com/gsi/client" async defer></script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}</script><script>
 (function(){
 const KEY='nico-hertz-timecards-v1',PAY='nico-hertz-pay-v1';
-const el=id=>document.getElementById(id),money=n=>'</body></html>
-+n.toFixed(2);
+const el=id=>document.getElementById(id),money=n=>String.fromCharCode(36)+n.toFixed(2);
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 let cards={};try{const v=JSON.parse(localStorage.getItem(KEY)||'{}');if(v&&typeof v==='object'&&!Array.isArray(v))cards=v}catch{}
 const pay=()=>{try{return {rate:15.5,differential:1,threshold:40,multiplier:1.5,weekday:4,...JSON.parse(localStorage.getItem(PAY)||'{}')}}catch{return {rate:15.5,differential:1,threshold:40,multiplier:1.5,weekday:4}}};

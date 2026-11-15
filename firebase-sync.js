@@ -52,9 +52,9 @@ async function startSync(){
    const d=snap.data(),state=states.get(k),incoming=JSON.stringify(d.value??null);
    if(!state||d.version<=state.version)return;
    const current=serial(k);
-   if(current!==state.value){stop();notice('Sync paused: both devices changed data. Your local changes are preserved. Save a backup and reconcile before restarting.');return}
+   if(incoming===current){states.set(k,{version:d.version,value:incoming});return}if(current!==state.value){stop();notice('Sync paused: both devices changed data. Your local changes are preserved. Save a backup and reconcile before restarting.');return}
    apply(k,d.value??null);states.set(k,{version:d.version,value:incoming});
-   notice('Cloud changes received. Reload Life Hub to display them.');
+   notice('Cloud changes received. Updating Life Hub…');location.reload();
   },()=>{stop();notice('Sync disconnected. Your local information remains available.')}));
   timer=setInterval(pushChanges,3500);
   notice('Automatic sync ON. Changes sync while Life Hub is open. Reload to see changes received from another device.');

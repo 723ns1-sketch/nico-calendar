@@ -3,7 +3,7 @@ import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase
 import {getAuth,GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,getRedirectResult,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getFirestore,doc,getDoc,setDoc,serverTimestamp,onSnapshot,runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 const config={apiKey:"AIzaSyCoiR62g9Z7TLCwLKe0P1DiZWbJGDniKOw",authDomain:"nico-life-hub.firebaseapp.com",projectId:"nico-life-hub",storageBucket:"nico-life-hub.firebasestorage.app",messagingSenderId:"205338393707",appId:"1:205338393707:web:ed76da7b3ec40ba1cc852e"};
-const keys=['nico-calendar-events-v1','nico-calendar-regular-shift-v1','nico-calendar-fmla-v1','nico-hertz-pay-v1','nico-planning-tools-v1'];
+const keys=['nico-calendar-events-v1','nico-calendar-regular-shift-v1','nico-calendar-fmla-v1','nico-hertz-pay-v1','nico-planning-tools-v1','nico-hertz-timecards-v1'];
 const status=document.getElementById('cloudStatus'),login=document.getElementById('cloudLogin'),logout=document.getElementById('cloudLogout'),upload=document.getElementById('cloudUpload'),restore=document.getElementById('cloudRestore'),auto=document.getElementById('cloudAuto'),syncStatus=document.getElementById('cloudSyncStatus');
 const AUTO_KEY='nico-life-hub-auto-sync-v1';
 const say=s=>{status.textContent=s},notice=s=>{syncStatus.textContent=s};

@@ -10,7 +10,7 @@ const read=(key,def)=>{try{return JSON.parse(localStorage.getItem(key)||'null')?
 const category=e=>{const t=(e.title||'')+' '+(e.notes||''),c=e.category||'';if(c==='Work Schedule'||/hertz|work shift|irr shift/i.test(t))return 'Hertz';if(c==='Project Due'||/college|assignment|homework|exam|quiz|course|syllabus|class|discussion post/i.test(t))return 'College';if(c==='Lambda Theta Sigma Meeting'||/lambda theta sigma|director of wellness|brotherhood meeting/i.test(t))return 'Lambda';if(/bill|payment|mortgage|rent|insurance|credit card|utility|autopay/i.test(t))return 'Bills';return 'Personal'};
 const money=n=>'$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const eventsIn=(from,to)=>getEvents().filter(e=>e.displayDate>=from&&e.displayDate<=to).sort((a,b)=>a.displayDate.localeCompare(b.displayDate)||(a.start||'').localeCompare(b.start||''));
-const header=(icon,title,desc)=>'<div class="smart-head"><h3>'+icon+' '+title+'</h3><button type="button" id="smartClose">✕ Close</button></div><p class="smart-note">'+desc+'</p>';
+const header=(icon,title,desc)=>'<div class="smart-head"><h3>'+icon+' '+title+'</h3><button type="button" id="smartClose">🏠 Back to Icons</button></div><p class="smart-note">'+desc+'</p>';
 const row=e=>'<div class="smart-row"><strong>'+esc(e.title)+'</strong><small>'+esc(e.displayDate)+(e.start?' · '+esc(e.start):'')+' · '+esc(category(e))+'</small></div>';
 function open(kind){panel.classList.remove('hidden');panel.dataset.kind=kind;render();panel.scrollIntoView({behavior:'smooth',block:'start'})}
 window.lifeHubSmartOpen=open;

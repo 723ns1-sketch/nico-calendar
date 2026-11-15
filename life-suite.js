@@ -1,6 +1,6 @@
 (()=>{'use strict';
 const KEY='nico-life-suite-v1', $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const today=()=>new Date().toLocaleDateString('en-CA',{year:'numeric',month:'2-digit',day:'2-digit'}),dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+const dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'),today=()=>dateKey(new Date());
 let state={wellness:[],people:[],career:[],college:[],leadership:[],timeline:[]};try{const raw=JSON.parse(localStorage.getItem(KEY)||'{}');for(const k of Object.keys(state))if(Array.isArray(raw[k]))state[k]=raw[k]}catch{}
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(state));window.dispatchEvent(new Event('lifehub:changed'))};
 const events=()=>{try{return window.lifeHubGetEvents?.()||[]}catch{return []}};

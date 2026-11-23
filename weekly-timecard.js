@@ -13,8 +13,15 @@
   const drafts = new Map();
   let selectedWeek = '', followCurrent = true, dirty = false, settings = model.paySettings(read(PAY)), displayed = [];
 
+  function militaryTime(value) {
+    const time = String(value).trim();
+    return /^(?:[01]\d|2[0-3])[0-5]\d$/.test(time) ? time.slice(0, 2) + ':' + time.slice(2) : time;
+  }
+  function slotValues(row) {
+    return Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input => [input.dataset.field, ['in', 'out'].includes(input.dataset.field) ? militaryTime(input.value) : input.value]));
+  }
   function snapshot() {
-    return [...$('tcSlots').querySelectorAll('.tc-slot')].map(row => Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input => [input.dataset.field, input.value])));
+    return [...$('tcSlots').querySelectorAll('.tc-slot')].map(slotValues);
   }
   function remember() { if (dirty && selectedWeek && $('tcSlots').children.length) drafts.set(selectedWeek, snapshot()); }
   function savedSlot(date, cards) {
@@ -32,8 +39,8 @@
     const dates = model.weekDates(selectedWeek).map(date => '<option value="' + date + '"' + (date === slot.date ? ' selected' : used.has(date) ? ' disabled' : '') + '>' + safe(dateLabel(date)) + '</option>').join('');
     return '<fieldset class="tc-slot" data-slot="' + index + '"><legend>Workday ' + (index + 1) + '</legend>' +
       '<label class="tc-date">Work date<select data-field="date" aria-label="Workday ' + (index + 1) + ' date">' + dates + '</select></label>' +
-      '<label>Clock in<input data-field="in" type="time" value="' + safe(slot.in) + '"></label>' +
-      '<label>Clock out<input data-field="out" type="time" value="' + safe(slot.out) + '"></label>' +
+      '<label>Clock in (24h)<input data-field="in" type="text" inputmode="numeric" maxlength="5" pattern="(?:[01][0-9]|2[0-3]):?[0-5][0-9]" placeholder="HH:MM" title="24-hour time, from 00:00 to 23:59. Enter 17:30 or 1730." value="' + safe(slot.in) + '"></label>' +
+      '<label>Clock out (24h)<input data-field="out" type="text" inputmode="numeric" maxlength="5" pattern="(?:[01][0-9]|2[0-3]):?[0-5][0-9]" placeholder="HH:MM" title="24-hour time, from 00:00 to 23:59. Enter 17:30 or 1730." value="' + safe(slot.out) + '"></label>' +
       '<label>Unpaid break (min)<input data-field="break" type="number" min="0" max="1439" step="1" value="' + safe(slot.break) + '"></label>' +
       '<label>Differential hours<input data-field="diff" type="number" min="0" max="24" step="any" value="' + safe(slot.diff) + '"></label>' +
       '<label class="tc-notes">Notes<input data-field="notes" type="text" maxlength="250" placeholder="Optional" value="' + safe(slot.notes) + '"></label>' +
@@ -68,6 +75,7 @@
   });
   $('tcCurrentWeek').addEventListener('click', () => { remember(); followCurrent = true; $('tcFeedback').textContent = ''; render(); });
   $('tcSlots').addEventListener('change', event => {
+    if (['in', 'out'].includes(event.target.dataset.field)) { event.target.value = militaryTime(event.target.value); return; }
     if (event.target.dataset.field !== 'date') return;
     const index = Number(event.target.closest('.tc-slot').dataset.slot), slots = snapshot(), date = slots[index].date;
     if (slots.some((slot, i) => i !== index && slot.date === date)) { $('tcFeedback').textContent = 'That date already has a slot. Choose a different day.'; render(); return; }
@@ -76,7 +84,7 @@
   });
   $('tcSlots').addEventListener('input', event => {
     const row = event.target.closest('.tc-slot'); if (!row || event.target.dataset.field === 'date') return;
-    const values = Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input => [input.dataset.field, input.value]));
+    const values = slotValues(row);
     row.querySelector('[data-slot-hours]').textContent = work.timecardHours(values).toFixed(2) + ' hrs';
     dirty = true;
     $('tcFeedback').textContent = 'Unsaved changes. Choose Save workweek to update your totals.';

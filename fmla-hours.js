@@ -26,9 +26,8 @@
     return (timecardMinutes(card) ?? 0) / 60;
   }
 
-  function summarizeActualWork({ timecards, manualHours, start, end }) {
-    const result = { hours: 0, days: 0 };
-    if (!validDate(start) || !validDate(end) || start > end) return result;
+  function actualWorkDays({ timecards, manualHours, start, end }) {
+    if (!validDate(start) || !validDate(end) || start > end) return [];
     const records = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
     const inPeriod = date => validDate(date) && date >= start && date <= end;
     const byDate = new Map();
@@ -36,18 +35,21 @@
     for (const [date, value] of Object.entries(records(manualHours))) {
       if (!inPeriod(date) || !['number', 'string'].includes(typeof value) || String(value).trim() === '') continue;
       const hours = Number(value);
-      if (Number.isFinite(hours) && hours >= 0 && hours <= 24) byDate.set(date, hours * 60);
+      if (Number.isFinite(hours) && hours >= 0 && hours <= 24) byDate.set(date, { date, minutes: hours * 60, hours, source: 'manual' });
     }
     for (const [date, card] of Object.entries(records(timecards))) {
       if (!inPeriod(date)) continue;
       const minutes = timecardMinutes(card);
       // One daily record: a detailed timecard replaces the manual total for its date.
-      if (minutes !== null) byDate.set(date, minutes);
+      if (minutes !== null) byDate.set(date, { date, minutes, hours: minutes / 60, source: 'timecard', card });
     }
-    result.hours = [...byDate.values()].reduce((sum, minutes) => sum + minutes, 0) / 60;
-    result.days = byDate.size;
-    return result;
+    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  return { timecardHours, summarizeActualWork };
+  function summarizeActualWork(data) {
+    const days = actualWorkDays(data);
+    return { hours: days.reduce((sum, day) => sum + day.minutes, 0) / 60, days: days.length };
+  }
+
+  return { validDate, timecardHours, actualWorkDays, summarizeActualWork };
 });

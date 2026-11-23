@@ -40,7 +40,7 @@
     for (const [date, card] of Object.entries(records(timecards))) {
       if (!inPeriod(date)) continue;
       // An explicitly marked day off replaces an older manual worked-hour total.
-      if (card && ['off', 'pto', 'sick', 'other'].includes(card.status)) { byDate.delete(date); continue; }
+      if (card && ['off', 'pto', 'vacation', 'sick', 'other'].includes(card.status)) { byDate.delete(date); continue; }
       const minutes = timecardMinutes(card);
       // One daily record: a detailed timecard replaces the manual total for its date.
       if (minutes !== null) byDate.set(date, { date, minutes, hours: minutes / 60, source: 'timecard', card });

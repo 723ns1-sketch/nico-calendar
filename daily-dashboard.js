@@ -24,13 +24,12 @@ function openSection(id){const b=$(id);if(b)b.click()}
 welcome.addEventListener('click',e=>{const a=e.target.closest('[data-life-action]');if(!a)return;const action=a.dataset.lifeAction;if(action==='add')openSection('addBtn');if(action==='timecard')openSection('timecardShortcut');if(action==='paycheck')openSection('paycheckShortcut');if(action==='bills')openSection('billsShortcut');if(action==='college')document.querySelector('[data-dashboard="college"]')?.click()});
 function render(){
 const h=new Date().getHours();$('lifeHubGreeting').textContent=(h<12?'☀️ Good morning':h<17?'🌤️ Good afternoon':'🌙 Good evening')+', Nico 🩵';
-const cards=read('nico-hertz-timecards-v1',{});let week=0,all=0;const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),now.getDate()),weekday=window.LifeHubTimecard.paySettings(read('nico-hertz-pay-v1',{})).weekday;start.setDate(start.getDate()-(start.getDay()-weekday+7)%7);const startKey=[start.getFullYear(),String(start.getMonth()+1).padStart(2,'0'),String(start.getDate()).padStart(2,'0')].join('-');
-for(const [date,c] of Object.entries(cards)){const duration=window.LifeHubWorkHours.timecardHours(c);all+=duration;if(date>=startKey&&date<=todayISO())week+=duration}
-const p=read('nico-hertz-pay-v1',{}),rate=Number(p.rate)||15.5;const gross=week*rate;
+const model=window.LifeHubTimecard,now=todayISO(),pay=model.paySettings(read('nico-hertz-pay-v1',{}));
+const actual=model.summarize({timecards:read('nico-hertz-timecards-v1',{}),manualHours:read('nico-planning-tools-v1',{}).hours,settings:pay,selectedWeek:model.weekStart(now,pay.weekday),today:now}),week=actual.weekly.hours,gross=actual.weekly.gross;
 const upcoming=$('myDayUpcoming')?.querySelectorAll('.item').length||0;
 const today=$('myDayToday')?.querySelectorAll('.item').length||0;
 extra.innerHTML='<article><h3>🎯 Today at a glance</h3><strong>'+today+' calendar item'+(today===1?'':'s')+'</strong><p>'+upcoming+' upcoming event'+(upcoming===1?'':'s')+' shown in your calendar overview.</p><button type="button" data-extra="calendar">📅 View calendar</button></article>'+
-'<article><h3>🚗 Hertz hours</h3><strong>'+week.toFixed(2)+' hrs</strong><p>Logged since your payroll-week start. Approx. $'+gross.toFixed(2)+' at $'+rate.toFixed(2)+'/hr before overtime, differential or deductions.</p><button type="button" data-extra="timecard">🕒 Open timecard</button></article>'+
+'<article><h3>🚗 Hertz hours</h3><strong>'+week.toFixed(2)+' hrs</strong><p>Saved actual hours this payroll week. Estimated gross $'+gross.toFixed(2)+' includes configured overtime and differential, before deductions.</p><button type="button" data-extra="timecard">🕒 Open timecard</button></article>'+
 '<article><h3>💵 Money & bills</h3><p>Check paycheck estimates and upcoming bills. Amounts are not live bank balances.</p><button type="button" data-extra="paycheck">💵 Paycheck</button> <button type="button" data-extra="bills">🧾 Bills</button></article>'+
 '<article><h3>📓 Take a moment</h3><p>A quick reflection can help you close out the day. Your journal opens in its own site.</p><a class="button" href="https://nico-quiet-storm-journal.ptbeta.chatgpt.site" target="_blank" rel="noopener noreferrer">Open Jacobi Journal</a></article>';
 }

@@ -9,7 +9,7 @@
   const money = value => value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   const dateLabel = date => new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   const rangeLabel = start => dateLabel(start) + ' – ' + dateLabel(model.addDays(start, 6));
-  const blankSlot = date => ({ date, status: 'worked', in: '', out: '', break: '0', diff: '0', notes: '' });
+  const blankSlot = date => ({ date, status: 'worked', leaveHours: '', in: '', out: '', break: '0', diff: '0', notes: '' });
   const drafts = new Map();
   let selectedWeek = '', followCurrent = true, dirty = false, settings = model.paySettings(read(PAY)), displayed = [];
 
@@ -26,7 +26,7 @@
   function remember() { if (dirty && selectedWeek && $('tcSlots').children.length) drafts.set(selectedWeek, snapshot()); }
   function savedSlot(date, cards) {
     const card = cards[date];
-    return card ? { date, status: Object.hasOwn(model.DAY_STATUSES, card.status) ? card.status : 'worked', in: card.in || '', out: card.out || '', break: String(card.break ?? 0), diff: String(card.diff ?? 0), notes: card.notes || '' } : blankSlot(date);
+    return card ? { date, status: Object.hasOwn(model.DAY_STATUSES, card.status) ? card.status : 'worked', leaveHours: card.leaveHours == null ? '' : String(card.leaveHours), in: card.in || '', out: card.out || '', break: String(card.break ?? 0), diff: String(card.diff ?? 0), notes: card.notes || '' } : blankSlot(date);
   }
   function write(cards) {
     localStorage.setItem(KEY, JSON.stringify(cards));
@@ -35,7 +35,7 @@
   function stat(value, label) { return '<div class="stat"><strong>' + value + '</strong><span>' + label + '</span></div>'; }
 
   function rowHTML(slot, index, rows, cards) {
-    const record = rows.find(day => day.date === slot.date), worked = slot.status === 'worked';
+    const record = rows.find(day => day.date === slot.date), worked = slot.status === 'worked', leave = model.LEAVE_STATUSES.includes(slot.status);
     const statuses = Object.entries(model.DAY_STATUSES).map(([value, label]) => '<option value="' + value + '"' + (value === slot.status ? ' selected' : '') + '>' + label + '</option>').join('');
     const hidden = worked ? '' : ' hidden', disabled = worked ? '' : ' disabled';
     return '<fieldset class="tc-slot" data-slot="' + index + '" data-status="' + slot.status + '"><legend>' + safe(dateLabel(slot.date)) + '</legend>' +
@@ -45,15 +45,17 @@
       '<label data-work-field' + hidden + '>Clock out (24h)<input data-field="out" type="text" inputmode="numeric" maxlength="5" pattern="(?:[01][0-9]|2[0-3]):?[0-5][0-9]" placeholder="HH:MM" title="24-hour time, from 00:00 to 23:59. Enter 17:30 or 1730." value="' + safe(slot.out) + '"' + disabled + '></label>' +
       '<label data-work-field' + hidden + '>Unpaid break (min)<input data-field="break" type="number" min="0" max="1439" step="1" value="' + safe(slot.break) + '"' + disabled + '></label>' +
       '<label data-work-field' + hidden + '>Differential hours<input data-field="diff" type="number" min="0" max="24" step="any" value="' + safe(slot.diff) + '"' + disabled + '></label>' +
+      '<label class="tc-leave" data-leave-field' + (leave ? '' : ' hidden') + '>Hours taken<input data-field="leaveHours" type="number" min="0" max="24" step="any" placeholder="Enter hours" value="' + safe(slot.leaveHours) + '"' + (leave ? '' : ' disabled') + '></label>' +
       '<label class="tc-notes">Notes<input data-field="notes" type="text" maxlength="250" placeholder="Optional" value="' + safe(slot.notes) + '"></label>' +
-      '<div class="tc-slot-total"><strong data-slot-hours>' + (worked ? (slot.in || slot.out ? work.timecardHours(slot) : record?.hours || 0).toFixed(2) + ' hrs' : model.DAY_STATUSES[slot.status]) + '</strong>' +
+      '<div class="tc-slot-total"><strong data-slot-hours>' + (worked ? (slot.in || slot.out ? work.timecardHours(slot) : record?.hours || 0).toFixed(2) + ' hrs' : model.DAY_STATUSES[slot.status] + (leave && slot.leaveHours !== '' ? ' · ' + Number(slot.leaveHours).toFixed(2) + ' hrs' : '')) + '</strong>' +
       (Object.hasOwn(cards, slot.date) ? '<button type="button" data-remove="' + index + '">Remove entry</button>' : '<span class="note">' + (record?.source === 'manual' ? 'Logged in Reminders' : 'No saved timecard') + '</span>') + '</div></fieldset>';
   }
   function updateRow(row) {
-    const values = slotValues(row), worked = values.status === 'worked';
+    const values = slotValues(row), worked = values.status === 'worked', leave = model.LEAVE_STATUSES.includes(values.status);
     row.dataset.status = values.status;
     row.querySelectorAll('[data-work-field]').forEach(label => { label.hidden = !worked; label.querySelector('input').disabled = !worked; });
-    row.querySelector('[data-slot-hours]').textContent = worked ? work.timecardHours(values).toFixed(2) + ' hrs' : model.DAY_STATUSES[values.status];
+    row.querySelectorAll('[data-leave-field]').forEach(label => { label.hidden = !leave; label.querySelector('input').disabled = !leave; });
+    row.querySelector('[data-slot-hours]').textContent = worked ? work.timecardHours(values).toFixed(2) + ' hrs' : model.DAY_STATUSES[values.status] + (leave && values.leaveHours !== '' && Number.isFinite(Number(values.leaveHours)) ? ' · ' + Number(values.leaveHours).toFixed(2) + ' hrs' : '');
   }
   function render() {
     settings = model.paySettings(read(PAY));
@@ -70,9 +72,10 @@
     $('tcSummary').innerHTML = stat(result.weekly.hours.toFixed(2) + ' hrs', 'Hours worked this week') + stat(money(result.weekly.gross), 'Estimated gross for worked hours') + stat(result.weekly.overtime.toFixed(2) + ' hrs', 'Overtime for this week');
     $('tcCumulative').innerHTML = stat(result.cumulative.hours.toFixed(2) + ' hrs', 'Cumulative hours worked') + stat(money(result.cumulative.gross), 'Cumulative estimated gross');
     $('tcCumulativePeriod').textContent = 'Since your first workday, ' + dateLabel(model.CUMULATIVE_START) + ', through ' + dateLabel(now) + '. Includes saved timecards and manual worked hours, counted once per date.';
-    const marked = displayed.filter(slot => Object.hasOwn(cards, slot.date) && cards[slot.date].status && cards[slot.date].status !== 'worked');
-    $('tcEntries').textContent = marked.length ? marked.length + ' day' + (marked.length === 1 ? '' : 's') + ' marked Off, PTO, Sick, or Other in this week.' : '';
+    const marked = displayed.filter(slot => cards[slot.date]?.status && cards[slot.date].status !== 'worked');
+    $('tcEntries').textContent = marked.length ? marked.length + ' day' + (marked.length === 1 ? '' : 's') + ' marked as time off in this week. Enter Hours taken for PTO, Vacation, or Sick to total that leave.' : '';
     window.refreshLifeHubFmla?.();
+    window.dispatchEvent(new Event('lifehub:workweek-changed'));
   }
 
   $('tcWeek').addEventListener('change', () => {
@@ -97,7 +100,7 @@
     event.preventDefault();
     try {
       const result = model.saveWorkweek({ timecards: read(KEY), slots: snapshot(), start: selectedWeek });
-      if (!result.saved) { $('tcFeedback').textContent = 'Enter worked times or mark a day Off, PTO, Sick, or Other, then save.'; return; }
+      if (!result.saved) { $('tcFeedback').textContent = 'Enter worked times or mark a day Off, PTO, Vacation, Sick, or Other, then save.'; return; }
       write(result.cards); drafts.delete(selectedWeek); render();
       $('tcFeedback').textContent = 'Saved ' + result.saved + ' day' + (result.saved === 1 ? '' : 's') + '. Weekly, cumulative, and FMLA totals updated.';
     } catch (error) { $('tcFeedback').textContent = error.message || 'Unable to save this workweek. Check your entries and try again.'; }
@@ -126,6 +129,7 @@
     if (next.weekday !== settings.weekday) { followCurrent = true; drafts.clear(); }
     render();
   });
+  window.addEventListener('lifehub:hours-changed', () => { remember(); render(); });
   window.addEventListener('storage', event => { if (event.key === null || [KEY, PAY, TRACK].includes(event.key)) { remember(); render(); } });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { remember(); render(); } });
   render();

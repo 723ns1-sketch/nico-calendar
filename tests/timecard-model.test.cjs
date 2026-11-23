@@ -172,3 +172,61 @@ test('changing a leave day back to Worked requires clock times and rejects inval
   assert.throws(() => model.saveWorkweek({ timecards: existing, slots: entries, start: '2026-11-19' }), /valid day status/);
   assert.equal(existing[entries[0].date].status, 'off');
 });
+
+test('totals entered PTO, vacation, and sick hours without inflating worked hours or pay', () => {
+  const entries = slots();
+  entries[0] = { ...entries[0], ...shift };
+  entries[1] = { ...entries[1], status: 'pto', leaveHours: '7.5' };
+  entries[2] = { ...entries[2], status: 'vacation', leaveHours: '8' };
+  entries[3] = { ...entries[3], status: 'sick', leaveHours: '4' };
+  const saved = model.saveWorkweek({ timecards: {}, slots: entries, start: '2026-11-19' });
+  const restored = JSON.parse(JSON.stringify(saved.cards));
+  assert.deepEqual(model.leaveUsage({ timecards: restored }), {
+    pto: { hours: 7.5, days: 1, pending: 0 },
+    vacation: { hours: 8, days: 1, pending: 0 },
+    sick: { hours: 4, days: 1, pending: 0 }
+  });
+  const actual = summary({ timecards: restored });
+  assert.equal(actual.weekly.hours, 8);
+  assert.equal(actual.weekly.gross, 124);
+});
+
+test('timecards override calendar leave on the same date and keep other calendar leave', () => {
+  const events = [
+    { date: '2026-11-20', category: 'PTO Taken', leaveHours: 8 },
+    { date: '2026-11-21', category: 'Vacation', leaveHours: 8 },
+    { date: '2026-11-22', category: 'PTO Taken', leaveHours: 4 },
+    { date: '2026-11-23', category: 'Sick Day', leaveHours: 6 },
+    { date: '2026-11-24', category: 'Vacation', leaveHours: 8 }
+  ];
+  const timecards = {
+    '2026-11-20': { status: 'pto', leaveHours: 7.5 },
+    '2026-11-21': { status: 'off' },
+    '2026-11-23': shift
+  };
+  const usage = model.leaveUsage({ timecards, events });
+  assert.deepEqual(usage.pto, { hours: 11.5, days: 2, pending: 0 });
+  assert.deepEqual(usage.vacation, { hours: 8, days: 1, pending: 0 });
+  assert.deepEqual(usage.sick, { hours: 0, days: 0, pending: 0 });
+});
+
+test('keeps legacy leave labels as days needing hours instead of inventing paid hours', () => {
+  const usage = model.leaveUsage({ timecards: { '2026-11-20': { status: 'pto' }, '2026-11-21': { status: 'vacation', leaveHours: 0 } } });
+  assert.deepEqual(usage.pto, { hours: 0, days: 1, pending: 1 });
+  assert.deepEqual(usage.vacation, { hours: 0, days: 1, pending: 0 });
+  const entries = slots(); entries[0].status = 'pto'; entries[0].leaveHours = 25;
+  assert.throws(() => model.saveWorkweek({ timecards: {}, slots: entries, start: '2026-11-19' }), /between 0 and 24/);
+});
+
+test('limits leave totals to the requested dates and ignores Google events and invalid data', () => {
+  const usage = model.leaveUsage({ start: '2026-11-10', end: '2026-11-22', timecards: {
+    '2026-11-09': { status: 'pto', leaveHours: 8 },
+    '2026-11-22': { status: 'pto', leaveHours: 4 },
+    '2026-11-23': { status: 'pto', leaveHours: 8 },
+    '2026-11-31': { status: 'sick', leaveHours: 8 },
+    '2026-11-21': null
+  }, events: [{ date: '2026-11-20', category: 'PTO Taken', leaveHours: 8, source: 'google' }] });
+  assert.deepEqual(usage.pto, { hours: 4, days: 1, pending: 0 });
+  assert.deepEqual(usage.sick, { hours: 0, days: 0, pending: 0 });
+  assert.equal(model.leaveUsage({ timecards: null, events: null }).pto.hours, 0);
+});

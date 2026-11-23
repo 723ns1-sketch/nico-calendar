@@ -14,7 +14,8 @@
   'use strict';
   const CUMULATIVE_START = '2026-11-10';
   const FIRST_PERIOD_END = '2026-11-12';
-  const DAY_STATUSES = { worked: 'Worked', off: 'Off', pto: 'PTO', sick: 'Sick', other: 'Other' };
+  const DAY_STATUSES = { worked: 'Worked', off: 'Off', pto: 'PTO', vacation: 'Vacation', sick: 'Sick', other: 'Other' };
+  const LEAVE_STATUSES = ['pto', 'vacation', 'sick'];
   const DEFAULT_WEEKDAY = 5;
   const iso = date => date.toISOString().slice(0, 10);
   const dateObject = date => new Date(date + 'T12:00:00Z');
@@ -61,6 +62,31 @@
     const rows = ledger(timecards, manualHours, settings);
     return { rows, weekly: total(rows.filter(day => day.week === selectedWeek)), cumulative: total(rows.filter(day => day.date >= CUMULATIVE_START && day.date <= today)) };
   }
+  function leaveUsage({ timecards = {}, events = [], start = CUMULATIVE_START, end = '9999-12-31' }) {
+    const result = Object.fromEntries(LEAVE_STATUSES.map(status => [status, { hours: 0, days: 0, pending: 0 }]));
+    if (!work.validDate(start) || !work.validDate(end) || start > end) return result;
+    const cards = timecards && typeof timecards === 'object' && !Array.isArray(timecards) ? timecards : {};
+    const dates = Object.fromEntries(LEAVE_STATUSES.map(status => [status, new Set()]));
+    const inRange = date => work.validDate(date) && date >= start && date <= end;
+    const add = (date, status, value) => {
+      if (!inRange(date) || !LEAVE_STATUSES.includes(status)) return;
+      dates[status].add(date);
+      const hours = Number(value);
+      if (value === null || value === undefined || String(value).trim() === '' || !Number.isFinite(hours) || hours < 0 || hours > 24) result[status].pending++;
+      else result[status].hours += hours;
+    };
+    const categories = { 'PTO Taken': 'pto', Vacation: 'vacation', 'Sick Day': 'sick' };
+    for (const event of Array.isArray(events) ? events : []) {
+      if (!event || event.source === 'google' || !Object.hasOwn(categories, event.category)) continue;
+      const card = cards[event.date];
+      // A detailed daily timecard replaces a calendar leave entry for that date.
+      if (card && (Object.hasOwn(DAY_STATUSES, card.status) || work.timecardHours(card) > 0)) continue;
+      add(event.date, categories[event.category], event.leaveHours ?? 8);
+    }
+    for (const [date, card] of Object.entries(cards)) if (card) add(date, card.status, card.leaveHours);
+    for (const status of LEAVE_STATUSES) result[status].days = dates[status].size;
+    return result;
+  }
   function workweeks({ today, weekday = DEFAULT_WEEKDAY, dates = [] }) {
     const result = new Set(), last = weekStart(addMonths(today, 6), weekday);
     for (let date = weekStart(CUMULATIVE_START, weekday); date <= last; date = addDays(date, 7)) result.add(date);
@@ -77,7 +103,10 @@
       used.add(slot.date);
       const status = slot.status || 'worked';
       if (!Object.hasOwn(DAY_STATUSES, status)) throw Error('Choose a valid day status for ' + slot.date + '.');
-      const card = { status, in: slot.in, out: slot.out, break: Number(slot.break || 0), diff: Number(slot.diff || 0), notes: String(slot.notes || '').trim() };
+      const hasLeaveHours = slot.leaveHours !== null && slot.leaveHours !== undefined && String(slot.leaveHours).trim() !== '';
+      const leaveHours = LEAVE_STATUSES.includes(status) && hasLeaveHours ? Number(slot.leaveHours) : null;
+      if (leaveHours !== null && (!Number.isFinite(leaveHours) || leaveHours < 0 || leaveHours > 24)) throw Error('Enter between 0 and 24 hours taken for ' + slot.date + '.');
+      const card = { status, leaveHours, in: slot.in, out: slot.out, break: Number(slot.break || 0), diff: Number(slot.diff || 0), notes: String(slot.notes || '').trim() };
       if (status !== 'worked') {
         updates.push([slot.date, { ...card, in: '', out: '', break: 0, diff: 0 }]);
         continue;
@@ -91,5 +120,5 @@
     for (const [date, card] of updates) cards[date] = { ...cards[date], ...card };
     return { cards, saved: updates.length };
   }
-  return { CUMULATIVE_START, FIRST_PERIOD_END, DAY_STATUSES, addDays, addMonths, paySettings, alignPayPeriod, weekStart, weekDates, ledger, summarize, workweeks, slotDates, saveWorkweek };
+  return { CUMULATIVE_START, FIRST_PERIOD_END, DAY_STATUSES, LEAVE_STATUSES, addDays, addMonths, paySettings, alignPayPeriod, weekStart, weekDates, ledger, summarize, leaveUsage, workweeks, slotDates, saveWorkweek };
 });

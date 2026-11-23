@@ -8,17 +8,14 @@ const dateISO=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(
 const asDate=s=>new Date(s+'T12:00:00');
 const weekdayStart=(s,day)=>{const d=asDate(s);d.setDate(d.getDate()-(d.getDay()-day+7)%7);return dateISO(d)};
 const plusDays=(s,n)=>{const d=asDate(s);d.setDate(d.getDate()+n);return dateISO(d)};
-const hours=c=>window.LifeHubWorkHours.timecardHours(c);
 const safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function save(){localStorage.setItem(STORE,JSON.stringify(settings))}
 function weeks(){
  const p=window.LifeHubTimecard.paySettings(parse(PAY,{}));
  const cards=parse(TC,{}),groups=new Map();
- for(const [date,c] of Object.entries(cards)){
-  if(!/^\d{4}-\d\d-\d\d$/.test(date)||!c?.in||!c?.out||(c.status&&c.status!=='worked'))continue;
-  const w=weekdayStart(date,Number(p.weekday)),h=hours(c),diff=Math.min(h,Math.max(0,Number(c.diff)||0));
-  const g=groups.get(w)||{start:w,hours:0,diff:0,shifts:0};
-  g.hours+=h;g.diff+=diff;g.shifts++;groups.set(w,g);
+ for(const day of window.LifeHubTimecard.ledger(cards,parse('nico-planning-tools-v1',{}).hours,p)){
+  const w=day.week,g=groups.get(w)||{start:w,hours:0,diff:0,shifts:0};
+  g.hours+=day.hours;g.diff+=day.differential;g.shifts++;groups.set(w,g);
  }
  return [...groups.values()].sort((a,b)=>b.start.localeCompare(a.start)).map(g=>{
   const regular=Math.min(g.hours,Number(p.threshold)),ot=Math.max(0,g.hours-Number(p.threshold));
@@ -50,7 +47,7 @@ $('pcAddSavings').addEventListener('click',()=>{const n=Number($('pcSavingAmount
 $('pcUndoSavings').addEventListener('click',()=>{const n=Number($('pcSavingAmount').value);if(!Number.isFinite(n)||n<=0)return;settings.saved=Math.max(0,Math.round(((Number(settings.saved)||0)-n)*100)/100);$('pcSavingAmount').value='';save();render()});
 $('paycheckShortcut').addEventListener('click',()=>{const panel=$('paycheckPanel');panel.classList.remove('hidden');render();panel.scrollIntoView({behavior:'smooth',block:'start'})});
 $('paycheckClose').addEventListener('click',()=>$('paycheckPanel').classList.add('hidden'));
-window.addEventListener('storage',e=>{if([TC,PAY,STORE].includes(e.key)){settings={...defaults,...parse(STORE,{})};render()}});
+window.addEventListener('storage',e=>{if(e.key===null||[TC,PAY,STORE,'nico-planning-tools-v1'].includes(e.key)){settings={...defaults,...parse(STORE,{})};render()}});
 window.addEventListener('lifehub:hours-changed',render);
 render();
 })();

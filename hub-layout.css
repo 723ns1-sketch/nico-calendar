@@ -1,0 +1,222 @@
+/* Full-page Life Hub layout. Keep the existing apps and their saved data intact. */
+:root {
+  color-scheme: dark;
+  --hub-surface: #1c1b24;
+  --hub-border: #3c3442;
+  --hub-muted: #c3bac8;
+}
+
+html { scroll-padding-top: 24px; }
+body {
+  min-width: 320px;
+  background: #111117;
+  font-size: 16px;
+  line-height: 1.5;
+}
+body > header {
+  padding: 24px clamp(18px, 4vw, 64px);
+  background: linear-gradient(110deg, #3c182d, #1b1721 65%, #16161e);
+  border-bottom: 1px solid #503347;
+}
+body > header h1 { font-size: clamp(24px, 3vw, 32px); letter-spacing: -.6px; }
+body > header p { margin-top: 5px; font-size: 14px; color: #d4bfce; }
+body .shell {
+  width: 100%;
+  max-width: none;
+  margin-inline: auto;
+  padding: 0 clamp(18px, 4vw, 64px) 48px;
+}
+
+/* The launcher is a page, rather than a simulated phone. */
+body #phoneHome {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+body #phoneHome .phone-frame {
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+body #phoneHome .phone-status,
+body #phoneHome .phone-sun { display: none; }
+body #phoneHome .phone-hero {
+  position: relative;
+  margin: 0 0 28px;
+  padding: 36px 240px 30px 0;
+  border-bottom: 1px solid #332b39;
+}
+body #phoneHome .phone-hero > p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  letter-spacing: 1.7px;
+  color: #d2a7bf;
+}
+body #phoneHome .phone-hero h2 {
+  margin: 0 0 12px;
+  font-size: clamp(28px, 3.2vw, 46px);
+  line-height: 1.2;
+  letter-spacing: -1px;
+}
+body #phoneHome #phoneDate { font-size: 16px; color: var(--hub-muted); }
+body #notificationBell {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px 18px;
+  border: 1px solid #765067;
+  border-radius: 12px;
+  background: #342333;
+  font-size: 14px;
+}
+body #notificationBell:hover { background: #513149; }
+
+/* Keep each original button, icon color, and click handler. */
+body #phoneHome .phone-app-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 18px;
+  margin: 0;
+}
+body #phoneHome .phone-app {
+  justify-content: center;
+  align-items: center;
+  min-height: 154px;
+  gap: 14px;
+  padding: 22px 12px !important;
+  border: 1px solid var(--hub-border) !important;
+  border-radius: 16px;
+  background: var(--hub-surface) !important;
+  color: #faf6fb !important;
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 650;
+  text-align: center;
+  transition: background .16s, border-color .16s, transform .16s;
+}
+body #phoneHome .phone-app:hover {
+  background: #2a202d !important;
+  border-color: #946079 !important;
+  transform: translateY(-3px);
+}
+body #phoneHome .phone-app:focus-visible {
+  outline: 3px solid #e7abc9;
+  outline-offset: 4px;
+}
+body #phoneHome .phone-app .phone-icon {
+  flex: 0 0 auto;
+  width: 60px;
+  height: 60px;
+  border-radius: 17px;
+  font-size: 30px;
+  box-shadow: inset 0 1px 0 #ffffff26;
+}
+body #phoneHome .phone-app:hover .phone-icon,
+body #phoneHome .phone-app:focus-visible .phone-icon { transform: none; }
+body #phoneHome .phone-dock {
+  margin-top: 30px;
+  padding: 20px 0 0;
+  border-top: 1px solid #332b39;
+  border-radius: 0;
+  background: none;
+  color: #afa4b6;
+  font-size: 14px;
+  text-align: left;
+}
+
+/* Give the existing tools the same usable page width. */
+body #lifeSuitePanel,
+body #hubSmartTools,
+body #healthFinanceCenter {
+  max-height: none;
+  margin-top: 24px;
+  padding: clamp(18px, 2.5vw, 32px);
+  border-color: #65506a;
+  border-radius: 16px;
+  background: #1c1a24;
+}
+body .suite-head h3,
+body .smart-head h3,
+body .hf-heading h3 { font-size: clamp(22px, 2.4vw, 30px); }
+body .suite-head,
+body .smart-head { flex-wrap: wrap; }
+body .suite-sub,
+body .smart-note,
+body .hf-note,
+body .hf-small,
+body .note,
+body .notify-help { font-size: 14px; line-height: 1.6; }
+body .suite-stat small,
+body .suite-row small,
+body .suite-form label,
+body .suite-tab,
+body .suite-head button,
+body .smart-head button,
+body .notify-heading button { font-size: 14px; }
+body .suite-stats { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+body .suite-form { padding: 20px; gap: 14px; }
+body .suite-form input,
+body .suite-form textarea {
+  padding: 12px;
+  border: 1px solid #66586c;
+  background: #14131b;
+  color: #fff;
+  font-size: 16px;
+}
+body .suite-row { padding: 16px; }
+body .suite-row button,
+body .suite-tab { min-height: 44px; }
+body .notify-item { padding: 16px; }
+body .notify-item small { font-size: 14px; }
+body.hub-open .shell { padding-top: 24px; }
+body .toolbar { gap: 10px; }
+body .toolbar > button,
+body .toolbar > a { min-height: 44px; }
+body #phoneHomeBack {
+  border-radius: 12px;
+  border-width: 1px;
+  font-size: 14px;
+  box-shadow: 0 5px 20px #0005;
+}
+body dialog { width: min(640px, calc(100vw - 28px)); padding: 24px; }
+body dialog label { font-size: 14px; }
+body dialog input,
+body dialog select,
+body dialog textarea { font-size: 16px; }
+
+@media (min-width: 1560px) {
+  body #phoneHome .phone-app-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}
+@media (max-width: 1100px) {
+  body #phoneHome .phone-app-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  body > header { padding-block: 20px; }
+  body #phoneHome .phone-hero { padding: 28px 0; }
+  body #notificationBell { position: static; transform: none; margin-top: 20px; }
+  body #phoneHome .phone-app-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  body #phoneHome .phone-app { min-height: 144px; }
+}
+@media (max-width: 520px) {
+  body .shell { padding-inline: 16px; padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+  body > header { padding-inline: 18px; }
+  body #phoneHome .phone-hero h2 { font-size: 30px; letter-spacing: -.6px; }
+  body #phoneHome .phone-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  body #phoneHome .phone-app { min-height: 140px; padding: 20px 10px !important; font-size: 16px; }
+  body #phoneHome .phone-app .phone-icon { width: 56px; height: 56px; font-size: 28px; border-radius: 16px; }
+  body .suite-form { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body #phoneHome .phone-app { transition: none; }
+  body #phoneHome .phone-app:hover { transform: none; }
+}

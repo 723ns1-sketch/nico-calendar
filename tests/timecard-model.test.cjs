@@ -17,7 +17,7 @@ test('builds workweek choices through six calendar months and keeps recorded his
   assert.equal(weeks[0], '2026-11-05');
   assert.equal(weeks.at(-1), '2027-05-20');
   assert.ok(weeks.includes('2026-11-19'));
-  assert.ok(model.workweeks({ today: '2026-11-22', dates: ['2026-10-16'] }).includes('2026-10-15'));
+  assert.ok(model.workweeks({ today: '2026-11-22', dates: ['2026-10-16'] }).includes('2026-10-16'));
   assert.equal(model.addMonths('2026-08-31', 6), '2027-02-28');
 });
 
@@ -92,4 +92,35 @@ test('preserves and counts more than five saved days without adding extra slots'
   assert.equal(result.weekly.hours, 48);
   assert.equal(model.slotDates({ start: '2026-11-19', rows: result.rows }).length, 5);
   assert.equal(Object.keys(timecards).length, 6);
+});
+
+test('anchors default pay periods to the first Thursday ending November 12', () => {
+  assert.equal(model.weekStart('2026-11-12'), '2026-11-06');
+  assert.equal(model.weekStart('2026-11-13'), '2026-11-13');
+  assert.equal(model.weekStart('2026-11-19'), '2026-11-13');
+  assert.equal(model.weekStart('2026-11-20'), '2026-11-20');
+  assert.equal(model.weekStart('2026-11-26'), '2026-11-20');
+  const weeks = model.workweeks({ today: '2026-11-22' });
+  assert.deepEqual(weeks.slice(0, 3), ['2026-11-06', '2026-11-13', '2026-11-20']);
+  assert.equal(weeks.at(-1), '2027-05-21');
+});
+
+test('aligns existing payroll settings once while preserving wages and other settings', () => {
+  const saved = { ...settings, rate: 18.75, differential: 2, differentialWeeks: { '2026-11-19': 6 }, time: '00:00' };
+  const aligned = model.alignPayPeriod(saved);
+  assert.equal(aligned.weekday, 5);
+  assert.equal(aligned.periodEndingAnchor, '2026-11-12');
+  assert.equal(aligned.rate, 18.75);
+  assert.deepEqual(aligned.differentialWeeks, saved.differentialWeeks);
+  assert.equal(saved.weekday, 4);
+  assert.deepEqual(model.alignPayPeriod({ ...aligned, weekday: 1 }), { ...aligned, weekday: 1 });
+  assert.equal(model.alignPayPeriod(null).weekday, 5);
+});
+
+test('keeps Thursday hours in the previous period without losing cumulative hours', () => {
+  const result = summary({ settings: model.paySettings(), selectedWeek: '2026-11-20', timecards: { '2026-11-19': shift, '2026-11-20': shift } });
+  assert.equal(result.weekly.hours, 8);
+  assert.equal(result.weekly.gross, 124);
+  assert.equal(result.cumulative.hours, 16);
+  assert.equal(result.cumulative.gross, 248);
 });

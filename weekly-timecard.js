@@ -54,7 +54,7 @@
     const result = model.summarize({ timecards: cards, manualHours, settings, selectedWeek, today: now });
     const weeks = model.workweeks({ today: now, weekday: settings.weekday, dates: result.rows.map(day => day.date) });
     if (!weeks.includes(selectedWeek)) weeks.push(selectedWeek);
-    $('tcWeek').innerHTML = weeks.sort().map(start => '<option value="' + start + '"' + (start === selectedWeek ? ' selected' : '') + '>' + (start === current ? 'Current week · ' : '') + safe(rangeLabel(start)) + '</option>').join('');
+    $('tcWeek').innerHTML = weeks.sort().map(start => '<option value="' + start + '"' + (start === selectedWeek ? ' selected' : '') + '>' + (start === current ? 'Current · ' : '') + 'Period ending ' + safe(dateLabel(model.addDays(start, 6))) + '</option>').join('');
     $('tcWeekLabel').textContent = 'Selected workweek: ' + rangeLabel(selectedWeek) + ' · Base rate ' + money(settings.rate) + '/hr';
     const regularShift = read('nico-calendar-regular-shift-v1');
     displayed = drafts.get(selectedWeek) || model.slotDates({ start: selectedWeek, rows: result.rows, off: Array.isArray(regularShift.off) ? regularShift.off : [] }).map(date => savedSlot(date, cards));

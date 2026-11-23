@@ -13,7 +13,7 @@ const hours=c=>Math.max(0,((minutes(c.out)-minutes(c.in)+1440)%1440-Number(c.bre
 const safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function save(){localStorage.setItem(STORE,JSON.stringify(settings))}
 function weeks(){
- const p={rate:15.5,differential:1,threshold:40,multiplier:1.5,weekday:4,...parse(PAY,{})};
+ const p=window.LifeHubTimecard.paySettings(parse(PAY,{}));
  const cards=parse(TC,{}),groups=new Map();
  for(const [date,c] of Object.entries(cards)){
   if(!/^\d{4}-\d\d-\d\d$/.test(date)||!c?.in||!c?.out)continue;

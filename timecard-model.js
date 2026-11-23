@@ -2,10 +2,19 @@
   const work = typeof module === 'object' && module.exports ? require('./fmla-hours.js') : window.LifeHubWorkHours;
   const api = factory(work);
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (typeof window !== 'undefined') window.LifeHubTimecard = api;
+  if (typeof window !== 'undefined') {
+    window.LifeHubTimecard = api;
+    try {
+      const key = 'nico-hertz-pay-v1', saved = JSON.parse(localStorage.getItem(key) || 'null');
+      const aligned = api.alignPayPeriod(saved);
+      if (JSON.stringify(aligned) !== JSON.stringify(saved)) localStorage.setItem(key, JSON.stringify(aligned));
+    } catch { /* The calculator also supports browser-local settings in memory. */ }
+  }
 })(function (work) {
   'use strict';
   const CUMULATIVE_START = '2026-11-11';
+  const FIRST_PERIOD_END = '2026-11-12';
+  const DEFAULT_WEEKDAY = 5;
   const iso = date => date.toISOString().slice(0, 10);
   const dateObject = date => new Date(date + 'T12:00:00Z');
   const addDays = (date, days) => { const d = dateObject(date); d.setUTCDate(d.getUTCDate() + days); return iso(d); };
@@ -21,10 +30,16 @@
       const n = Number(value[key]);
       return value[key] !== null && value[key] !== '' && Number.isFinite(n) && n >= min && n <= max ? n : fallback;
     };
-    const weekday = number('weekday', 4, 0, 6);
-    return { rate: number('rate', 15.5, 0), differential: number('differential', 1, 0), threshold: number('threshold', 40, 1, 168), multiplier: number('multiplier', 1.5, 1), weekday: Number.isInteger(weekday) ? weekday : 4 };
+    const weekday = number('weekday', DEFAULT_WEEKDAY, 0, 6);
+    return { rate: number('rate', 15.5, 0), differential: number('differential', 1, 0), threshold: number('threshold', 40, 1, 168), multiplier: number('multiplier', 1.5, 1), weekday: Number.isInteger(weekday) ? weekday : DEFAULT_WEEKDAY };
   }
-  function weekStart(date, weekday = 4) {
+  function alignPayPeriod(value) {
+    const saved = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const weekday = Number(saved.weekday);
+    if (saved.periodEndingAnchor === FIRST_PERIOD_END && Number.isInteger(weekday) && weekday >= 0 && weekday <= 6) return { ...saved };
+    return { ...saved, weekday: DEFAULT_WEEKDAY, periodEndingAnchor: FIRST_PERIOD_END };
+  }
+  function weekStart(date, weekday = DEFAULT_WEEKDAY) {
     const d = dateObject(date);
     return addDays(date, -(d.getUTCDay() - weekday + 7) % 7);
   }
@@ -45,7 +60,7 @@
     const rows = ledger(timecards, manualHours, settings);
     return { rows, weekly: total(rows.filter(day => day.week === selectedWeek)), cumulative: total(rows.filter(day => day.date >= CUMULATIVE_START && day.date <= today)) };
   }
-  function workweeks({ today, weekday = 4, dates = [] }) {
+  function workweeks({ today, weekday = DEFAULT_WEEKDAY, dates = [] }) {
     const result = new Set(), last = weekStart(addMonths(today, 6), weekday);
     for (let date = weekStart(CUMULATIVE_START, weekday); date <= last; date = addDays(date, 7)) result.add(date);
     result.add(weekStart(today, weekday));
@@ -73,5 +88,5 @@
     for (const [date, card] of updates) cards[date] = { ...cards[date], ...card };
     return { cards, saved: updates.length };
   }
-  return { CUMULATIVE_START, addDays, addMonths, paySettings, weekStart, weekDates, ledger, summarize, workweeks, slotDates, saveWorkweek };
+  return { CUMULATIVE_START, FIRST_PERIOD_END, addDays, addMonths, paySettings, alignPayPeriod, weekStart, weekDates, ledger, summarize, workweeks, slotDates, saveWorkweek };
 });

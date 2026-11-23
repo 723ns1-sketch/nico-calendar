@@ -290,10 +290,24 @@ function readCSV(raw){let rows=csvRows(raw);if(!rows.length)return [];let header
 $('importCalendarBtn').onclick=()=>$('calendarFile').click();$('calendarFile').onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let raw=await f.text(),imported=f.name.toLowerCase().endsWith('.ics')?readICS(raw):readCSV(raw);if(!imported.length)throw Error('No supported events within November 2026–December 2027 were found.');if(!confirm(`Import ${imported.length} events as Other? Existing entries will be kept. You can edit categories afterward.`))return;let ids=new Set(events.map(x=>x.id)),added=0;for(let item of imported)if(!ids.has(item.id)){events.push(item);ids.add(item.id);added++}persist();render();alert(`${added} events imported. ${imported.length-added} duplicate IDs skipped. Review dates and times, especially for events from different time zones.`)}catch(err){alert('Calendar import failed: '+err.message)}finally{e.target.value=''}};
 // Google Calendar OAuth two-way integration. Uses Google Identity Services token client.
 const GOOGLE_CONFIG_KEY='nico-google-client-id-v1';
+const GOOGLE_DEFAULT_CLIENT_ID='1042087641110-lcm6k7lf5puvm6ed12m53vetar6qehqn.apps.googleusercontent.com';
+const validGoogleClientId=id=>typeof id==='string'&&/^[\w-]+\.apps\.googleusercontent\.com$/.test(id);
 let googleToken='',googleExpiry=0,googleTokenClient=null,googleBusy=false;
 const googleStatus=message=>{$('googleStatus').textContent=message};
-$('googleClientId').value=localStorage.getItem(GOOGLE_CONFIG_KEY)||'';
-$('saveGoogleConfig').onclick=()=>{let id=$('googleClientId').value.trim();if(!/^[\w-]+\.apps\.googleusercontent\.com$/.test(id)){googleStatus('Enter a valid Google OAuth web client ID.');return}localStorage.setItem(GOOGLE_CONFIG_KEY,id);googleTokenClient=null;googleStatus('Configuration saved. Click Connect Google.')};
+function configuredGoogleClientId(){
+ const typed=$('googleClientId').value.trim();
+ const id=typed||GOOGLE_DEFAULT_CLIENT_ID;
+ if(!validGoogleClientId(id))return '';
+ $('googleClientId').value=id;
+ try{localStorage.setItem(GOOGLE_CONFIG_KEY,id)}catch{/* The website default remains available when browser storage is blocked. */}
+ return id;
+}
+let savedGoogleClientId='';
+try{savedGoogleClientId=localStorage.getItem(GOOGLE_CONFIG_KEY)||''}catch{}
+$('googleClientId').value=validGoogleClientId(savedGoogleClientId)?savedGoogleClientId:GOOGLE_DEFAULT_CLIENT_ID;
+configuredGoogleClientId();
+googleStatus('Google Calendar configuration is ready. Click Connect Google to authorize calendar access.');
+$('saveGoogleConfig').onclick=()=>{if(!configuredGoogleClientId()){googleStatus('That client ID is not valid. Clear the field to use Life Hub’s saved configuration, then click Save configuration.');return}googleTokenClient=null;googleStatus('Configuration saved. Click Connect Google.')};
 function googleReady(){return !!googleToken&&Date.now()<googleExpiry-60000}
 async function googleApi(path,options={}){if(!googleReady())throw Error('Google session expired. Click Connect Google again.');let r=await fetch('https://www.googleapis.com/calendar/v3/'+path,{...options,headers:{Authorization:'Bearer '+googleToken,'Content-Type':'application/json',...(options.headers||{})}});if(!r.ok){let data=await r.json().catch(()=>({}));throw Error(data.error?.message||('Google API error '+r.status))}return r.status===204?null:r.json()}
 function googleEventToLocal(e){let raw=e.start?.dateTime||e.start?.date;if(!raw)return null;let date=raw.slice(0,10);if(!inRange(date))return null;let start=e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('en-GB',{timeZone:'America/Chicago',hour:'2-digit',minute:'2-digit',hour12:false}):'';let end=e.end?.dateTime?new Date(e.end.dateTime).toLocaleTimeString('en-GB',{timeZone:'America/Chicago',hour:'2-digit',minute:'2-digit',hour12:false}):'';return {id:'gcal-'+e.id,googleId:e.id,source:'google',date,title:e.summary||'(Untitled Google event)',category:'Other',start,end,notes:e.description||'',repeat:false,breakMinutes:0,leaveHours:0,googleAllDay:!e.start?.dateTime}}
@@ -301,8 +315,8 @@ async function refreshGoogle(){if(googleBusy)return;googleBusy=true;googleStatus
 // Previously approved Google Calendar access should not force a new consent screen on every click.
 let googlePopupFailures=0;
 $('googleConnect').onclick=()=>{
-  const id=$('googleClientId').value.trim();
-  if(!/^[\w-]+\.apps\.googleusercontent\.com$/.test(id)){googleStatus('Enter and save a valid Google OAuth web client ID.');return}
+  const id=configuredGoogleClientId();
+  if(!id){googleStatus('That client ID is not valid. Clear the field to use Life Hub’s saved configuration, then click Connect Google.');return}
   if(location.protocol==='file:'){googleStatus('Google connection requires the published HTTPS website, not a downloaded file.');return}
   if(!window.google?.accounts?.oauth2){googleStatus('Google sign-in library did not load. Reload the website and check privacy extensions.');return}
   if(googleBusy){googleStatus('Google Calendar is still loading.');return}
@@ -351,8 +365,8 @@ googleRedirectButton.textContent='Connect Google without popup';
 googleRedirectButton.title='Use a full-page Google sign-in instead of a popup';
 $('googleConnect').insertAdjacentElement('afterend',googleRedirectButton);
 googleRedirectButton.onclick=()=>{
-  const id=$('googleClientId').value.trim();
-  if(!/^[\w-]+\.apps\.googleusercontent\.com$/.test(id)){googleStatus('Enter a valid Google OAuth client ID and click Save configuration first.');return}
+  const id=configuredGoogleClientId();
+  if(!id){googleStatus('That client ID is not valid. Clear the field to use Life Hub’s saved configuration, then try again.');return}
   if(location.protocol!=='https:'){googleStatus('Full-page Google sign-in requires HTTPS.');return}
   const bytes=new Uint8Array(24);
   crypto.getRandomValues(bytes);

@@ -14,7 +14,7 @@
 
   function timecardMinutes(card) {
     const time = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-    if (!card || !time.test(card.in) || !time.test(card.out)) return null;
+    if (!card || (card.status && card.status !== 'worked') || !time.test(card.in) || !time.test(card.out)) return null;
     const minutes = value => Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
     const span = (minutes(card.out) - minutes(card.in) + 1440) % 1440;
     const unpaid = Number(card.break || 0);
@@ -39,6 +39,8 @@
     }
     for (const [date, card] of Object.entries(records(timecards))) {
       if (!inPeriod(date)) continue;
+      // An explicitly marked day off replaces an older manual worked-hour total.
+      if (card && ['off', 'pto', 'sick', 'other'].includes(card.status)) { byDate.delete(date); continue; }
       const minutes = timecardMinutes(card);
       // One daily record: a detailed timecard replaces the manual total for its date.
       if (minutes !== null) byDate.set(date, { date, minutes, hours: minutes / 60, source: 'timecard', card });

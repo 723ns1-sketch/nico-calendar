@@ -4,7 +4,7 @@ const model = require('../timecard-model.js');
 const shift = { in: '08:00', out: '16:00', break: 0, diff: 0, notes: '' };
 const settings = { rate: 15.5, differential: 1, threshold: 40, multiplier: 1.5, weekday: 4 };
 const summary = data => model.summarize({ settings, today: '2026-11-22', selectedWeek: '2026-11-19', ...data });
-const slots = () => model.weekDates('2026-11-19').slice(0, 5).map(date => ({ date, in: '', out: '', break: 0, diff: 0, notes: '' }));
+const slots = () => model.weekDates('2026-11-19').map(date => ({ date, in: '', out: '', break: 0, diff: 0, notes: '' }));
 
 test('uses the configured workweek, including weekends', () => {
   assert.equal(model.weekStart('2026-11-22', 4), '2026-11-19');
@@ -21,8 +21,8 @@ test('builds workweek choices through six calendar months and keeps recorded his
   assert.equal(model.addMonths('2026-08-31', 6), '2027-02-28');
 });
 
-test('chooses five slots around saved dates and regular days off', () => {
-  assert.deepEqual(model.slotDates({ start: '2026-11-19', rows: [], off: [0, 6] }), ['2026-11-19', '2026-11-20', '2026-11-23', '2026-11-24', '2026-11-25']);
+test('shows all seven dates in order, including regular days off', () => {
+  assert.deepEqual(model.slotDates({ start: '2026-11-19', rows: [], off: [0, 6] }), ['2026-11-19', '2026-11-20', '2026-11-21', '2026-11-22', '2026-11-23', '2026-11-24', '2026-11-25']);
 });
 
 test('shows hours and pay only from the selected week', () => {
@@ -41,14 +41,14 @@ test('calculates weekly overtime and differential at the configured rates', () =
   assert.equal(result.weekly.gross, 746.25);
 });
 
-test('cumulative totals begin November 11 and exclude future dates', () => {
-  const result = summary({ timecards: { '2026-11-10': shift, '2026-11-11': shift, '2026-11-23': shift } });
+test('cumulative totals begin on the first workday, November 10 and exclude future dates', () => {
+  const result = summary({ timecards: { '2026-11-09': shift, '2026-11-10': shift, '2026-11-23': shift } });
   assert.equal(result.cumulative.hours, 8);
   assert.equal(result.cumulative.gross, 124);
 });
 
 test('retains overtime earned before the cumulative start within that workweek', () => {
-  const timecards = Object.fromEntries(['2026-11-05','2026-11-06','2026-11-07','2026-11-08','2026-11-09','2026-11-11'].map(date => [date, shift]));
+  const timecards = Object.fromEntries(['2026-11-05','2026-11-06','2026-11-07','2026-11-08','2026-11-09','2026-11-10'].map(date => [date, shift]));
   const result = summary({ timecards });
   assert.equal(result.cumulative.hours, 8);
   assert.equal(result.cumulative.gross, 186);
@@ -61,7 +61,7 @@ test('includes manual worked hours once, with detailed timecards taking preceden
   assert.equal(result.cumulative.hours, 13);
 });
 
-test('saving five slots updates only entered dates and preserves other weeks', () => {
+test('saving seven days updates only entered dates and preserves other weeks', () => {
   const existing = { '2026-11-12': shift, '2026-11-20': shift };
   const entries = slots(); entries[1] = { ...entries[1], ...shift, out: '17:00' };
   const result = model.saveWorkweek({ timecards: existing, slots: entries, start: '2026-11-19' });
@@ -80,17 +80,17 @@ test('rejects duplicate dates, partial timecards, and dates outside the week bef
   assert.throws(() => model.saveWorkweek({ timecards: {}, slots: outside, start: '2026-11-19' }), /within this week/);
 });
 
-test('requires five slots without deleting existing entries for blank slots', () => {
+test('requires seven days without deleting existing entries for blank slots', () => {
   const existing = { '2026-11-20': shift };
   assert.deepEqual(model.saveWorkweek({ timecards: existing, slots: slots(), start: '2026-11-19' }).cards, existing);
-  assert.throws(() => model.saveWorkweek({ timecards: existing, slots: slots().slice(0, 4), start: '2026-11-19' }), /five workday slots/);
+  assert.throws(() => model.saveWorkweek({ timecards: existing, slots: slots().slice(0, 4), start: '2026-11-19' }), /seven days/);
 });
 
-test('preserves and counts more than five saved days without adding extra slots', () => {
+test('preserves six saved shifts while showing every day of the week', () => {
   const timecards = Object.fromEntries(model.weekDates('2026-11-19').slice(0, 6).map(date => [date, shift]));
   const result = summary({ timecards });
   assert.equal(result.weekly.hours, 48);
-  assert.equal(model.slotDates({ start: '2026-11-19', rows: result.rows }).length, 5);
+  assert.equal(model.slotDates({ start: '2026-11-19', rows: result.rows }).length, 7);
   assert.equal(Object.keys(timecards).length, 6);
 });
 
@@ -123,4 +123,52 @@ test('keeps Thursday hours in the previous period without losing cumulative hour
   assert.equal(result.weekly.gross, 124);
   assert.equal(result.cumulative.hours, 16);
   assert.equal(result.cumulative.gross, 248);
+});
+
+test('saves and pays all seven worked days, with overtime across the full week', () => {
+  const entries = slots().map(day => ({ ...day, ...shift, status: 'worked' }));
+  const saved = model.saveWorkweek({ timecards: {}, slots: entries, start: '2026-11-19' });
+  assert.equal(saved.saved, 7);
+  const result = summary({ timecards: saved.cards, today: '2026-11-25' });
+  assert.equal(result.weekly.hours, 56);
+  assert.equal(result.weekly.overtime, 16);
+  assert.equal(result.weekly.gross, 992);
+  assert.equal(result.cumulative.hours, 56);
+});
+
+test('saves Off, PTO, Sick, and Other without work times and excludes them from hours and pay', () => {
+  const entries = slots();
+  entries[0] = { ...entries[0], ...shift };
+  ['off', 'pto', 'sick', 'other'].forEach((status, index) => {
+    entries[index + 1] = { ...entries[index + 1], ...shift, status, notes: 'Saved ' + status };
+  });
+  const original = { '2026-11-20': { ...shift }, '2026-11-12': shift };
+  const saved = model.saveWorkweek({ timecards: original, slots: entries, start: '2026-11-19' });
+  const restored = JSON.parse(JSON.stringify(saved.cards));
+  assert.equal(saved.saved, 5);
+  ['off', 'pto', 'sick', 'other'].forEach((status, index) => {
+    const card = restored[entries[index + 1].date];
+    assert.equal(card.status, status);
+    assert.equal(card.in, '');
+    assert.equal(card.out, '');
+    assert.equal(card.diff, 0);
+    assert.equal(card.notes, 'Saved ' + status);
+  });
+  const result = summary({ timecards: restored, manualHours: { '2026-11-20': 8 } });
+  assert.equal(result.weekly.hours, 8);
+  assert.equal(result.weekly.gross, 124);
+  assert.equal(original['2026-11-20'].in, '08:00');
+  assert.deepEqual(restored['2026-11-12'], shift);
+});
+
+test('changing a leave day back to Worked requires clock times and rejects invalid statuses', () => {
+  const entries = slots();
+  entries[0].status = 'worked';
+  const existing = { [entries[0].date]: { status: 'off', in: '', out: '', break: 0, diff: 0, notes: '' } };
+  assert.throws(() => model.saveWorkweek({ timecards: existing, slots: entries, start: '2026-11-19' }), /Check the times/);
+  entries[0] = { ...entries[0], ...shift };
+  assert.equal(model.saveWorkweek({ timecards: existing, slots: entries, start: '2026-11-19' }).cards[entries[0].date].status, 'worked');
+  entries[6].status = 'invalid';
+  assert.throws(() => model.saveWorkweek({ timecards: existing, slots: entries, start: '2026-11-19' }), /valid day status/);
+  assert.equal(existing[entries[0].date].status, 'off');
 });

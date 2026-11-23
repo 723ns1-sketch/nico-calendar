@@ -8,15 +8,14 @@ const dateISO=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(
 const asDate=s=>new Date(s+'T12:00:00');
 const weekdayStart=(s,day)=>{const d=asDate(s);d.setDate(d.getDate()-(d.getDay()-day+7)%7);return dateISO(d)};
 const plusDays=(s,n)=>{const d=asDate(s);d.setDate(d.getDate()+n);return dateISO(d)};
-const minutes=s=>Number(s.slice(0,2))*60+Number(s.slice(3,5));
-const hours=c=>Math.max(0,((minutes(c.out)-minutes(c.in)+1440)%1440-Number(c.break||0))/60);
+const hours=c=>window.LifeHubWorkHours.timecardHours(c);
 const safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function save(){localStorage.setItem(STORE,JSON.stringify(settings))}
 function weeks(){
  const p=window.LifeHubTimecard.paySettings(parse(PAY,{}));
  const cards=parse(TC,{}),groups=new Map();
  for(const [date,c] of Object.entries(cards)){
-  if(!/^\d{4}-\d\d-\d\d$/.test(date)||!c?.in||!c?.out)continue;
+  if(!/^\d{4}-\d\d-\d\d$/.test(date)||!c?.in||!c?.out||(c.status&&c.status!=='worked'))continue;
   const w=weekdayStart(date,Number(p.weekday)),h=hours(c),diff=Math.min(h,Math.max(0,Number(c.diff)||0));
   const g=groups.get(w)||{start:w,hours:0,diff:0,shifts:0};
   g.hours+=h;g.diff+=diff;g.shifts++;groups.set(w,g);
@@ -52,5 +51,6 @@ $('pcUndoSavings').addEventListener('click',()=>{const n=Number($('pcSavingAmoun
 $('paycheckShortcut').addEventListener('click',()=>{const panel=$('paycheckPanel');panel.classList.remove('hidden');render();panel.scrollIntoView({behavior:'smooth',block:'start'})});
 $('paycheckClose').addEventListener('click',()=>$('paycheckPanel').classList.add('hidden'));
 window.addEventListener('storage',e=>{if([TC,PAY,STORE].includes(e.key)){settings={...defaults,...parse(STORE,{})};render()}});
+window.addEventListener('lifehub:hours-changed',render);
 render();
 })();

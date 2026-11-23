@@ -12,8 +12,9 @@
   }
 })(function (work) {
   'use strict';
-  const CUMULATIVE_START = '2026-11-11';
+  const CUMULATIVE_START = '2026-11-10';
   const FIRST_PERIOD_END = '2026-11-12';
+  const DAY_STATUSES = { worked: 'Worked', off: 'Off', pto: 'PTO', sick: 'Sick', other: 'Other' };
   const DEFAULT_WEEKDAY = 5;
   const iso = date => date.toISOString().slice(0, 10);
   const dateObject = date => new Date(date + 'T12:00:00Z');
@@ -67,19 +68,21 @@
     for (const date of dates) if (work.validDate(date)) result.add(weekStart(date, weekday));
     return [...result].sort();
   }
-  function slotDates({ start, rows, off = [] }) {
-    const dates = weekDates(start), saved = rows.filter(day => day.week === start).map(day => day.date);
-    const preferred = dates.filter(date => !off.includes(dateObject(date).getUTCDay()));
-    return [...new Set([...saved, ...preferred, ...dates])].slice(0, 5).sort();
-  }
+  const slotDates = ({ start }) => weekDates(start);
   function saveWorkweek({ timecards, slots, start }) {
-    if (!Array.isArray(slots) || slots.length !== 5) throw Error('Use the five workday slots for this week.');
+    if (!Array.isArray(slots) || slots.length !== 7) throw Error('Use all seven days for this workweek.');
     const allowed = new Set(weekDates(start)), used = new Set(), updates = [];
     for (const slot of slots) {
       if (!allowed.has(slot.date) || used.has(slot.date)) throw Error('Choose a different work date within this week for each slot.');
       used.add(slot.date);
-      const card = { in: slot.in, out: slot.out, break: Number(slot.break || 0), diff: Number(slot.diff || 0), notes: String(slot.notes || '').trim() };
-      if (!card.in && !card.out && !card.break && !card.diff && !card.notes) continue;
+      const status = slot.status || 'worked';
+      if (!Object.hasOwn(DAY_STATUSES, status)) throw Error('Choose a valid day status for ' + slot.date + '.');
+      const card = { status, in: slot.in, out: slot.out, break: Number(slot.break || 0), diff: Number(slot.diff || 0), notes: String(slot.notes || '').trim() };
+      if (status !== 'worked') {
+        updates.push([slot.date, { ...card, in: '', out: '', break: 0, diff: 0 }]);
+        continue;
+      }
+      if (!card.in && !card.out && !card.break && !card.diff && !card.notes && (!timecards?.[slot.date]?.status || timecards[slot.date].status === 'worked')) continue;
       const hours = work.timecardHours(card);
       if (!card.in || !card.out || hours <= 0 || !Number.isFinite(card.diff) || card.diff < 0 || card.diff > hours) throw Error('Check the times, unpaid break, and differential hours for ' + slot.date + '.');
       updates.push([slot.date, card]);
@@ -88,5 +91,5 @@
     for (const [date, card] of updates) cards[date] = { ...cards[date], ...card };
     return { cards, saved: updates.length };
   }
-  return { CUMULATIVE_START, FIRST_PERIOD_END, addDays, addMonths, paySettings, alignPayPeriod, weekStart, weekDates, ledger, summarize, workweeks, slotDates, saveWorkweek };
+  return { CUMULATIVE_START, FIRST_PERIOD_END, DAY_STATUSES, addDays, addMonths, paySettings, alignPayPeriod, weekStart, weekDates, ledger, summarize, workweeks, slotDates, saveWorkweek };
 });

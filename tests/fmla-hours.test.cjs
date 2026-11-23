@@ -68,3 +68,12 @@ test('handles empty or invalid restored data without changing it', () => {
   assert.equal(JSON.stringify(cards), original);
   assert.equal(summarize({ timecards: cards, start: 'invalid' }).hours, 0);
 });
+
+test('day-off and leave statuses override stale clock times and manual worked hours', () => {
+  for (const status of ['off', 'pto', 'sick', 'other']) {
+    const cards = { [day]: { ...shift, status }, '2026-11-21': shift };
+    assert.equal(timecardHours(cards[day]), 0);
+    assert.deepEqual(summarize({ timecards: cards, manualHours: { [day]: 8 } }), { hours: 8, days: 1 });
+  }
+  assert.equal(timecardHours({ ...shift, status: 'worked' }), 8);
+});
